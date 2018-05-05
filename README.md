@@ -1,9 +1,9 @@
-# behaviortree.go
+# go-behaviortree
 
 Package behaviortree provides a functional style implementation of behavior trees
 in Golang with no fluff.
 
-Go doc: [https://godoc.org/github.com/joeycumines/behaviortree.go](https://godoc.org/github.com/joeycumines/behaviortree.go)
+Go doc: [https://godoc.org/github.com/joeycumines/go-behaviortree](https://godoc.org/github.com/joeycumines/go-behaviortree)
 
 Wikipedia: [Behavior tree - AI, robotics, and control](https://en.wikipedia.org/wiki/Behavior_tree_(artificial_intelligence,_robotics_and_control))
 
