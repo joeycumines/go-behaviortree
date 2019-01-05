@@ -17,9 +17,9 @@
 package behaviortree
 
 import (
-	"testing"
 	"github.com/go-test/deep"
 	"strings"
+	"testing"
 )
 
 func TestNode_Tick_nil(t *testing.T) {

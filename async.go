@@ -17,8 +17,8 @@
 package behaviortree
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 )
 
 // Async wraps a tick so that it runs asynchronously, note nil ticks will return nil
@@ -58,7 +58,7 @@ func Async(tick Tick) Tick {
 						return
 					}
 					status.Status = Failure
-					status.Error = fmt.Errorf("bt.Async recovered from panic: %+v", r)
+					status.Error = fmt.Errorf("behaviortree.Async recovered from panic: %+v", r)
 				}()
 				status.Status, status.Error = tick(children)
 			}()

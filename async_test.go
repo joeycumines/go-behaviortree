@@ -17,10 +17,10 @@
 package behaviortree
 
 import (
+	"errors"
+	"github.com/go-test/deep"
 	"testing"
 	"time"
-	"github.com/go-test/deep"
-	"errors"
 )
 
 func TestAsync_behaviour(t *testing.T) {
@@ -140,7 +140,7 @@ func TestAsync_panic(t *testing.T) {
 	time.Sleep(time.Millisecond * 5)
 	if status, err := node.Tick(); status != Failure {
 		t.Error("status was meant to be failure but it was", status)
-	} else if err == nil || err.Error() != "bt.Async recovered from panic: some_error" {
+	} else if err == nil || err.Error() != "behaviortree.Async recovered from panic: some_error" {
 		t.Error("unexpected error value:", err)
 	}
 }

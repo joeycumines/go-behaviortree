@@ -17,8 +17,8 @@
 package behaviortree
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestStatus_String(t *testing.T) {
@@ -88,7 +88,7 @@ func TestStatus_Status(t *testing.T) {
 		name := fmt.Sprintf("TestStatus_Status_#%d", i)
 
 		if actual := testCase.Status.Status(); actual != testCase.Expected {
-			t.Errorf("%s failed: expected bt.Status.Status '%s' != actual '%s'", name, testCase.Status, actual)
+			t.Errorf("%s failed: expected behaviortree.Status.Status '%s' != actual '%s'", name, testCase.Status, actual)
 		}
 	}
 }

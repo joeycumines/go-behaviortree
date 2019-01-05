@@ -17,9 +17,9 @@
 package behaviortree
 
 import (
-	"testing"
-	"reflect"
 	"errors"
+	"reflect"
+	"testing"
 )
 
 func TestSync_empty(t *testing.T) {

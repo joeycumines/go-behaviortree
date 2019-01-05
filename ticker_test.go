@@ -1,14 +1,14 @@
 package behaviortree
 
 import (
-	"testing"
-	"fmt"
 	"context"
-	"time"
-	"reflect"
-	"sync"
-	"runtime"
 	"errors"
+	"fmt"
+	"reflect"
+	"runtime"
+	"sync"
+	"testing"
+	"time"
 )
 
 func TestNewTicker_panic1(t *testing.T) {
@@ -83,7 +83,7 @@ func TestNewTicker_run(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 50)
 
-	v := c.(*nodeTicker)
+	v := c.(*tickerCore)
 
 	if v.node == nil || reflect.ValueOf(node).Pointer() != reflect.ValueOf(v.node).Pointer() {
 		//noinspection GoPrintFunctions
@@ -263,5 +263,120 @@ func TestNewTicker_runCancel(t *testing.T) {
 
 	if err := c.Err(); err == nil || err.Error() != "context deadline exceeded" {
 		t.Error("unexpected error", err)
+	}
+}
+
+func TestNewTickerStopOnFailure_success(t *testing.T) {
+	startGoroutines := runtime.NumGoroutine()
+	defer func() {
+		time.Sleep(time.Millisecond * 100)
+		endGoroutines := runtime.NumGoroutine()
+		if startGoroutines < endGoroutines {
+			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
+		}
+	}()
+	var (
+		mutex  sync.Mutex
+		count  int
+		ticker = NewTickerStopOnFailure(
+			context.Background(),
+			time.Millisecond*50,
+			func() (Tick, []Node) {
+				return func(children []Node) (Status, error) {
+					mutex.Lock()
+					defer mutex.Unlock()
+					if len(children) != 5 {
+						t.Error("bad children", len(children))
+					}
+					count++
+					if count == 5 {
+						return Failure, nil
+					}
+					return Success, nil
+				}, make([]Node, 5)
+			},
+		)
+	)
+	defer ticker.Stop()
+	timer := time.NewTimer(time.Millisecond * 350)
+	defer timer.Stop()
+	startedAt := time.Now()
+	select {
+	case <-timer.C:
+		t.Fatal("expected done")
+	case <-ticker.Done():
+	}
+	duration := time.Now().Sub(startedAt)
+	if duration < time.Millisecond*170 {
+		t.Error(duration.String())
+	}
+	mutex.Lock()
+	defer mutex.Unlock()
+	if err := ticker.Err(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestNewTickerStopOnFailure_error(t *testing.T) {
+	startGoroutines := runtime.NumGoroutine()
+	defer func() {
+		time.Sleep(time.Millisecond * 100)
+		endGoroutines := runtime.NumGoroutine()
+		if startGoroutines < endGoroutines {
+			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
+		}
+	}()
+	ticker := NewTickerStopOnFailure(
+		context.Background(),
+		time.Millisecond*50,
+		func() (Tick, []Node) {
+			return func(children []Node) (Status, error) {
+				return Failure, errors.New("some_error")
+			}, make([]Node, 5)
+		},
+	)
+	defer ticker.Stop()
+	<-ticker.Done()
+	if ticker.Err() == nil {
+		t.Fatal("expected an error")
+	}
+}
+
+func TestNewTickerStopOnFailure_nilNode(t *testing.T) {
+	startGoroutines := runtime.NumGoroutine()
+	defer func() {
+		time.Sleep(time.Millisecond * 100)
+		endGoroutines := runtime.NumGoroutine()
+		if startGoroutines < endGoroutines {
+			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
+		}
+	}()
+	defer func() {
+		if r := fmt.Sprint(recover()); r != "behaviortree.NewTickerStopOnFailure nil node" {
+			t.Error(r)
+		}
+	}()
+	NewTickerStopOnFailure(nil, 0, nil)
+}
+
+func TestNewTickerStopOnFailure_nilTick(t *testing.T) {
+	startGoroutines := runtime.NumGoroutine()
+	defer func() {
+		time.Sleep(time.Millisecond * 100)
+		endGoroutines := runtime.NumGoroutine()
+		if startGoroutines < endGoroutines {
+			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
+		}
+	}()
+	ticker := NewTickerStopOnFailure(
+		context.Background(),
+		time.Millisecond*10,
+		func() (tick Tick, nodes []Node) {
+			return
+		},
+	)
+	<-ticker.Done()
+	if err := ticker.Err(); err == nil || err.Error() != "behaviortree.Node cannot tick a node with a nil tick" {
+		t.Error(err)
 	}
 }

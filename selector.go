@@ -24,7 +24,7 @@ func Selector(children []Node) (Status, error) {
 	for i, c := range children {
 		status, err := c.Tick()
 		if err != nil {
-			return Failure, fmt.Errorf("bt.Selector encountered error with child at index %d: %s", i, err.Error())
+			return Failure, fmt.Errorf("behaviortree.Selector encountered error with child at index %d: %s", i, err.Error())
 		}
 		if status == Running {
 			return Running, nil

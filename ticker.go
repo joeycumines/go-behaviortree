@@ -1,15 +1,15 @@
 package behaviortree
 
 import (
-	"time"
-	"sync"
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 )
 
 type (
-	// Ticker is a node runner.
+	// Ticker models a node runner
 	Ticker interface {
 		// Done will close when the ticker is fully stopped.
 		Done() <-chan struct{}
@@ -21,7 +21,8 @@ type (
 		Stop()
 	}
 
-	nodeTicker struct {
+	// tickerCore is the base ticker implementation
+	tickerCore struct {
 		ctx    context.Context
 		cancel context.CancelFunc
 		node   Node
@@ -32,6 +33,17 @@ type (
 		mutex  sync.Mutex
 		err    error
 	}
+
+	// tickerStopOnFailure is an implementation of a ticker that will run until the first error
+	tickerStopOnFailure struct {
+		Ticker
+	}
+)
+
+var (
+	// errExitOnFailure is a specific error used internally to exit tickers constructed with NewTickerStopOnFailure,
+	// and won't be returned by the tickerStopOnFailure implementation
+	errExitOnFailure = errors.New("errExitOnFailure")
 )
 
 // NewTicker constructs a new Ticker, which simply uses time.Ticker to tick the provided node periodically, note
@@ -55,7 +67,7 @@ func NewTicker(ctx context.Context, duration time.Duration, node Node) Ticker {
 		panic(errors.New("behaviortree.NewTicker nil node"))
 	}
 
-	result := &nodeTicker{
+	result := &tickerCore{
 		node:   node,
 		ticker: time.NewTicker(duration),
 		done:   make(chan struct{}),
@@ -69,7 +81,37 @@ func NewTicker(ctx context.Context, duration time.Duration, node Node) Ticker {
 	return result
 }
 
-func (t *nodeTicker) run() {
+// NewTickerStopOnFailure returns a new Ticker that will exit on the first Failure, but won't return a non-nil Err
+// UNLESS there was an actual error returned, it's built on top of the same core implementation provided by NewTicker,
+// and uses that function directly, note that it will panic if the node is nil, the panic cases for NewTicker also
+// apply.
+func NewTickerStopOnFailure(ctx context.Context, duration time.Duration, node Node) Ticker {
+	if node == nil {
+		panic(errors.New("behaviortree.NewTickerStopOnFailure nil node"))
+	}
+
+	return tickerStopOnFailure{
+		Ticker: NewTicker(
+			ctx,
+			duration,
+			func() (Tick, []Node) {
+				tick, children := node()
+				if tick == nil {
+					return nil, children
+				}
+				return func(children []Node) (Status, error) {
+					status, err := tick(children)
+					if err == nil && status == Failure {
+						err = errExitOnFailure
+					}
+					return status, err
+				}, children
+			},
+		),
+	}
+}
+
+func (t *tickerCore) run() {
 	defer close(t.done)
 	defer t.cancel()
 	defer t.Stop()
@@ -95,19 +137,27 @@ func (t *nodeTicker) run() {
 	}
 }
 
-func (t *nodeTicker) Done() <-chan struct{} {
+func (t *tickerCore) Done() <-chan struct{} {
 	return t.done
 }
 
-func (t *nodeTicker) Err() error {
+func (t *tickerCore) Err() error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	return t.err
 }
 
-func (t *nodeTicker) Stop() {
+func (t *tickerCore) Stop() {
 	t.once.Do(func() {
 		t.ticker.Stop()
 		close(t.stop)
 	})
+}
+
+func (t tickerStopOnFailure) Err() error {
+	err := t.Ticker.Err()
+	if err == errExitOnFailure {
+		return nil
+	}
+	return err
 }

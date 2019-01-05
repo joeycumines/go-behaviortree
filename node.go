@@ -30,11 +30,11 @@ type (
 // Tick runs the node's tick function with it's children
 func (n Node) Tick() (Status, error) {
 	if n == nil {
-		return Failure, errors.New("bt.Node cannot tick a nil node")
+		return Failure, errors.New("behaviortree.Node cannot tick a nil node")
 	}
 	tick, children := n()
 	if tick == nil {
-		return Failure, errors.New("bt.Node cannot tick a node with a nil tick")
+		return Failure, errors.New("behaviortree.Node cannot tick a node with a nil tick")
 	}
 	return tick(children)
 }

@@ -17,9 +17,9 @@
 package behaviortree
 
 import (
-	"testing"
 	"github.com/go-test/deep"
 	"strings"
+	"testing"
 )
 
 func TestSelector_simple(t *testing.T) {
