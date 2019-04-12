@@ -15,6 +15,9 @@ type (
 
 	// Tick represents the logic for a node, which may or may not be stateful
 	Tick func(children []Node) (Status, error)
+
+	// Status is a type with three valid values, Running, Success, and Failure, the three possible states for BTs
+	Status int
 )
 
 // Tick runs the node's tick function with it's children
