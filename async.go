@@ -31,7 +31,7 @@ func Async(tick Tick) Tick {
 	var done chan struct {
 		Status Status
 		Error  error
-	} = nil
+	}
 
 	return func(children []Node) (Status, error) {
 		mutex.Lock()

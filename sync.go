@@ -68,14 +68,13 @@ func (s *syc) node(i int) Node {
 				// disabled tick - we just return the last status
 				return status, nil
 			}, children
-		} else {
-			return func(children []Node) (Status, error) {
-				s.mutex.Lock()
-				defer s.mutex.Unlock()
-				status, err := tick(children)
-				s.statuses[i] = status
-				return status, err
-			}, children
 		}
+		return func(children []Node) (Status, error) {
+			s.mutex.Lock()
+			defer s.mutex.Unlock()
+			status, err := tick(children)
+			s.statuses[i] = status
+			return status, err
+		}, children
 	}
 }

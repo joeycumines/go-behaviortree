@@ -64,9 +64,8 @@ func (m *manager) Add(ticker Ticker) error {
 	if m.stopped {
 		if err := m.err(); err != nil {
 			return err
-		} else {
-			return errors.New("behaviortree.Manager.Add already stopped")
 		}
+		return errors.New("behaviortree.Manager.Add already stopped")
 	}
 	m.tickers = append(m.tickers, ticker)
 	go func() {

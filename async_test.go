@@ -128,7 +128,6 @@ func TestAsync_panic(t *testing.T) {
 	node := NewNode(
 		Async(func(children []Node) (Status, error) {
 			panic("some_error")
-			return Success, nil
 		}),
 		nil,
 	)

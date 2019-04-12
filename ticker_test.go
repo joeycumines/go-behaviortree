@@ -75,8 +75,10 @@ func TestNewTicker_run(t *testing.T) {
 		}, nil
 	}
 
+	type stopComplain int
+
 	c := NewTicker(
-		context.WithValue(context.Background(), 1, 2),
+		context.WithValue(context.Background(), stopComplain(1), 2),
 		time.Millisecond*5,
 		node,
 	)
@@ -90,7 +92,7 @@ func TestNewTicker_run(t *testing.T) {
 		t.Error("unexpected node", v.node)
 	}
 
-	if v.ctx == nil || v.ctx.Value(1) != 2 {
+	if v.ctx == nil || v.ctx.Value(stopComplain(1)) != 2 {
 		t.Error("unexpected context", v.ctx)
 	}
 
