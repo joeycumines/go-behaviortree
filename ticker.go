@@ -3,7 +3,6 @@ package behaviortree
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -52,8 +51,6 @@ var (
 // The node will tick until the first error or Ticker.Stop is called, or context is canceled, after which any error
 // will be made available via Ticker.Err, before closure of the done channel, indicating that all resources have been
 // freed, and any error is available.
-//
-// Note that the ticker goroutine recovers from panics, which will be treated the same as an error case.
 func NewTicker(ctx context.Context, duration time.Duration, node Node) Ticker {
 	if ctx == nil {
 		panic(errors.New("behaviortree.NewTicker nil context"))
@@ -112,29 +109,25 @@ func NewTickerStopOnFailure(ctx context.Context, duration time.Duration, node No
 }
 
 func (t *tickerCore) run() {
-	defer close(t.done)
-	defer t.cancel()
-	defer t.Stop()
 	var err error
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("recovered from panic (%T): %+v", r, r)
-		}
-		t.mutex.Lock()
-		defer t.mutex.Unlock()
-		t.err = err
-	}()
+TickLoop:
 	for err == nil {
 		select {
 		case <-t.ctx.Done():
 			err = t.ctx.Err()
-			return
+			break TickLoop
 		case <-t.stop:
-			return
+			break TickLoop
 		case <-t.ticker.C:
 			_, err = t.node.Tick()
 		}
 	}
+	t.mutex.Lock()
+	t.err = err
+	t.mutex.Unlock()
+	t.Stop()
+	t.cancel()
+	close(t.done)
 }
 
 func (t *tickerCore) Done() <-chan struct{} {

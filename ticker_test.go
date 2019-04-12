@@ -147,43 +147,6 @@ func TestNewTicker_run(t *testing.T) {
 	}()
 }
 
-func TestNewTicker_runPanic(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 50)
-
-		endGoroutines := runtime.NumGoroutine()
-
-		if endGoroutines > startGoroutines {
-			t.Error("started with", startGoroutines, "goroutines and ended with", endGoroutines)
-		}
-	}()
-
-	node := func() (Tick, []Node) {
-		panic("some_panic")
-	}
-
-	startedAt := time.Now()
-	defer func() {
-		diff := time.Now().Sub(startedAt)
-		if diff > time.Millisecond*20 {
-			t.Error("unexpected diff", diff)
-		}
-	}()
-
-	c := NewTicker(
-		context.Background(),
-		time.Millisecond,
-		node,
-	)
-
-	<-c.Done()
-
-	if err := c.Err(); err == nil || err.Error() != "recovered from panic (string): some_panic" {
-		t.Error("unexpected error", err)
-	}
-}
-
 func TestNewTicker_runError(t *testing.T) {
 	startGoroutines := runtime.NumGoroutine()
 	defer func() {
