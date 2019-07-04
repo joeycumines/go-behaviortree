@@ -31,6 +31,9 @@ func (n Node) Tick() (Status, error)
     [Wikipedia page](https://en.wikipedia.org/wiki/Behavior_tree_(artificial_intelligence,_robotics_and_control))
 - Async and Sync wrappers allow for the definition of time consuming logic that gets performed in serial, but without
   blocking the tick operation, and can be used to implement complex behavior such as conditional exit of running nodes
+- Fork provides a group tick like Sequence and Selector, that runs it's children concurrently, and to completion
+- RateLimit is a common building block, and implements a Tick that will return Failure as necessary to maintain a rate
+- Not simply inverts a Tick's Status, but retains error handling (Failure on error value) behavior
 - Implementations to actually run behavior trees are provided, and include a Ticker and Manager, but both are defined
   by interfaces and are entirely optional
 - I use this implementation for several personal projects and will continue to add functionality after validating it's
