@@ -124,26 +124,6 @@ func TestAsync_error(t *testing.T) {
 	}
 }
 
-func TestAsync_panic(t *testing.T) {
-	node := NewNode(
-		Async(func(children []Node) (Status, error) {
-			panic("some_error")
-		}),
-		nil,
-	)
-	if status, err := node.Tick(); status != Running {
-		t.Error("status was meant to be running but it was", status)
-	} else if err != nil {
-		t.Error("error was non-nil", err)
-	}
-	time.Sleep(time.Millisecond * 5)
-	if status, err := node.Tick(); status != Failure {
-		t.Error("status was meant to be failure but it was", status)
-	} else if err == nil || err.Error() != "behaviortree.Async recovered from panic: some_error" {
-		t.Error("unexpected error value:", err)
-	}
-}
-
 func TestAsync_nil(t *testing.T) {
 	if Async(nil) != nil {
 		t.Fatal("expected nil tick")

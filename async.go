@@ -17,7 +17,6 @@
 package behaviortree
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -51,14 +50,6 @@ func Async(tick Tick) Tick {
 				}
 				defer func() {
 					done <- status
-				}()
-				defer func() {
-					r := recover()
-					if r == nil {
-						return
-					}
-					status.Status = Failure
-					status.Error = fmt.Errorf("behaviortree.Async recovered from panic: %+v", r)
 				}()
 				status.Status, status.Error = tick(children)
 			}()
