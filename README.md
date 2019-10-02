@@ -40,6 +40,7 @@ func (n Node) Tick() (Status, error)
   utilising the running status as it's cue to background a newly generated tick (supporting conditional backgrounding)
 - RateLimit is a common building block, and implements a Tick that will return Failure as necessary to maintain a rate
 - Not simply inverts a Tick's Status, but retains error handling (Failure on error value) behavior
+- Shuffle uses encapsulation to apply a random sort on child order prior to calling the underlying Tick
 - Implementations to actually run behavior trees are provided, and include a Ticker and Manager, but both are defined
   by interfaces and are entirely optional
 - I use this implementation for several personal projects and will continue to add functionality after validating it's

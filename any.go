@@ -30,14 +30,7 @@ func Any(tick Tick) Tick {
 		success bool
 	)
 	return func(children []Node) (Status, error) {
-		children = func(src []Node) (dst []Node) {
-			if src == nil {
-				return
-			}
-			dst = make([]Node, len(src))
-			copy(dst, src)
-			return
-		}(children)
+		children = copyNodes(children)
 		for i := range children {
 			child := children[i]
 			if child == nil {
@@ -74,4 +67,13 @@ func Any(tick Tick) Tick {
 		success = false
 		return Success, nil
 	}
+}
+
+func copyNodes(src []Node) (dst []Node) {
+	if src == nil {
+		return
+	}
+	dst = make([]Node, len(src))
+	copy(dst, src)
+	return
 }
