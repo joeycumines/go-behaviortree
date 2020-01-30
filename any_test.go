@@ -137,7 +137,7 @@ func ExampleAny_resetBehavior() {
 	//1
 	//failure <nil>
 	//1
-	//failure behaviortree.Sequence encountered error with child at index 0: some_error
+	//failure some_error
 	//1
 	//2
 	//success <nil>
@@ -282,7 +282,7 @@ func TestAny_nilChildTick(t *testing.T) {
 	if status != Failure {
 		t.Error(status)
 	}
-	if err == nil || err.Error() != `behaviortree.Sequence encountered error with child at index 0: behaviortree.Node cannot tick a node with a nil tick` {
+	if err == nil || err.Error() != `behaviortree.Node cannot tick a node with a nil tick` {
 		t.Error(err)
 	}
 }

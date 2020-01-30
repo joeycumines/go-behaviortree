@@ -16,15 +16,13 @@
 
 package behaviortree
 
-import "fmt"
-
-// Selector is a tick implementation that will succeed if no children fail, returning running if any children return
-// running, propagating any error
+// Selector is a tick implementation that ticks each child sequentially, until the the first error (returning the
+// error), the first non-failure status (returning the status), or all children are ticked (returning failure)
 func Selector(children []Node) (Status, error) {
-	for i, c := range children {
+	for _, c := range children {
 		status, err := c.Tick()
 		if err != nil {
-			return Failure, fmt.Errorf("behaviortree.Selector encountered error with child at index %d: %s", i, err.Error())
+			return Failure, err
 		}
 		if status == Running {
 			return Running, nil
