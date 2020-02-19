@@ -98,5 +98,3 @@ func TestSync_nilTick(t *testing.T) {
 		t.Error("expected children to be returned", children)
 	}
 }
-
-// TODO: finish testing sync

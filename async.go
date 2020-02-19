@@ -16,33 +16,22 @@
 
 package behaviortree
 
-import (
-	"sync"
-)
-
 // Async wraps a tick so that it runs asynchronously, note nil ticks will return nil
 func Async(tick Tick) Tick {
 	if tick == nil {
 		return nil
 	}
-
-	mutex := new(sync.Mutex)
 	var done chan struct {
 		Status Status
 		Error  error
 	}
-
 	return func(children []Node) (Status, error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-
 		if done == nil {
 			// start the async tick, the non-nil done indicates that we are running
 			done = make(chan struct {
 				Status Status
 				Error  error
 			}, 1)
-
 			go func() {
 				var status struct {
 					Status Status
@@ -53,16 +42,13 @@ func Async(tick Tick) Tick {
 				}()
 				status.Status, status.Error = tick(children)
 			}()
-
 			return Running, nil
 		}
-
 		// the node is currently running
 		select {
 		case status := <-done:
 			done = nil
 			return status.Status, status.Error
-
 		default:
 			return Running, nil
 		}

@@ -16,8 +16,6 @@
 
 package behaviortree
 
-import "sync"
-
 // Background pushes running nodes into the background, allowing multiple concurrent ticks (potentially running
 // independent children, depending on the behavior of the node). It accepts a tick via closure, in order to support
 // stateful ticks. On tick, backgrounded nodes are ticked from oldest to newest, until the first non-running status is
@@ -30,13 +28,8 @@ func Background(tick func() Tick) Tick {
 	if tick == nil {
 		return nil
 	}
-	var (
-		mutex sync.Mutex
-		nodes []Node
-	)
+	var nodes []Node
 	return func(children []Node) (Status, error) {
-		mutex.Lock()
-		defer mutex.Unlock()
 		for i, node := range nodes {
 			status, err := node.Tick()
 			if err == nil && status == Running {
