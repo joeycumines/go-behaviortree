@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/joeycumines/go-behaviortree)](https://goreportcard.com/report/joeycumines/go-behaviortree)
+
 # go-behaviortree
 
 Package behaviortree provides a simple and powerful Go implementation of behavior trees without fluff.
@@ -5,8 +7,6 @@ Package behaviortree provides a simple and powerful Go implementation of behavio
 Go doc: [https://godoc.org/github.com/joeycumines/go-behaviortree](https://godoc.org/github.com/joeycumines/go-behaviortree)
 
 Wikipedia: [Behavior tree - AI, robotics, and control](https://en.wikipedia.org/wiki/Behavior_tree_(artificial_intelligence,_robotics_and_control))
-
-> `go test`: 100% coverage | `go vet`: pass | `golint`: pass
 
 ```go
 type (
@@ -24,30 +24,73 @@ type (
 func (n Node) Tick() (Status, error)
 ```
 
-**Features**
+## Design
 
-- Core implementation as above
-- Sequence and Selector also provided as per the
-    [Wikipedia page](https://en.wikipedia.org/wiki/Behavior_tree_(artificial_intelligence,_robotics_and_control))
-- All, a stateless tick similar to Sequence which will attempt to run all nodes, even on (non-error) failure
-- Any, a stateful tick which uses encapsulation to patch a group tick's return status to be success if any children
-  succeeded, or failure if all children failed
-- Async and Sync wrappers allow for the definition of time consuming logic that gets performed in serial, but without
-  blocking the tick operation, and can be used to implement complex behavior such as conditional exit of running nodes
-- Fork provides a group tick like Sequence and Selector, that runs it's children concurrently, and to completion
-- Background, a stateful tick that supports multiple concurrent executions of _either_ static or dynamically generated
-  instances of another tick implementation, where all statuses are propagated 1-1, but not necessarily in order,
-  utilising the running status as it's cue to background a newly generated tick (supporting conditional backgrounding)
-- RateLimit is a common building block, and implements a Tick that will return Failure as necessary to maintain a rate
-- Not simply inverts a Tick's Status, but retains error handling (Failure on error value) behavior
-- Shuffle uses encapsulation to apply a random sort on child order prior to calling the underlying Tick
-- Implementations to actually run behavior trees are provided, and include a Ticker and Manager, but both are defined
-  by interfaces and are entirely optional
-- I use this implementation for several personal projects and will continue to add functionality after validating it's
-  overall value (NewTickerStopOnFailure used in the example below was added in this way)
+This library provides an implementation of the generalised behavior tree pattern. The three types above along with the
+stateless `Tick` functions `Selector` and `Sequence` (line for line from Wikipedia) make up the entirety of the core
+functionality. Additional features have been derived by means of iterating against specific, real-world problem cases.
 
-For the specific use case I built it for I have yet to find anything remotely comparable. It's also very unlikely this
-will ever see a V2, but quite likely that I will be supporting V1 for years.
+It is recommended that anyone interested in understanding behavior trees read from the start of chapter 1 of
+[Colledanchise, Michele & Ogren, Petter. (2018). Behavior Trees in Robotics and AI: An Introduction. 10.1201/9780429489105.](https://www.researchgate.net/publication/319463746_Behavior_Trees_in_Robotics_and_AI_An_Introduction)
+until at least (the end of) `1.3.2 - Control Flow Nodes with Memory`. Further context should (hopefully) go a long way
+in aiding newcomers to gain a firm grasp of the relevant behavior and associated patterns, in order to start building
+automations using behavior trees.
+
+N.B. Though it does appear to be an excellent resource, _Behavior Trees in Robotics and AI: An Introduction._ was only
+     brought to my attention well after the release of `v1.3.0`. In particular, concepts and terms are unlikely to be
+     entirely consistent.
+
+### Reactivity
+
+Executing a behavior tree sequentially (i.e. without the use of nodes that return `Running`) can be an effective way
+to decompose complicated switching logic. Though effective, this design suffers from limitations common to traditional
+finite state machines, which tends to cripple the modularity of any interruptable operations, as each tick must manage
+it's own exit condition(s). Golang's `context` doesn't really help in that case, either, being a communication
+mechanism, rather than a control mechanism. As an alternative, implementations may use pre-conditions (preceding
+child(ren) in a sequence), guarding an asynchronous tick. Context support may be desirable, and may be implemented as
+`Tick` implementations(s). Context support is peripheral in that it's only relevant to a subset of implementations,
+and was deliberately omitted (from `Tick`).
+
+### Modularity
+
+This library **only** concerns itself with the task of actually running behavior trees. It is deliberately designed
+to make it straightforward to plug in external implementations. External implementations _may_ be integrated as a
+fully-fledged recursively generated tree of `Node`. Tree-aware debug tracing could be implemented using a similar
+mechanism. At the end of the day though, implementations just need to `Tick`.
+
+## Implementation
+
+This section attempts to provide better insight into the _intent_ of certain implementation details. Part of this
+involves offering implementation **guidelines**, based on _imagined_ use cases (beyond those explored as part of each
+implementation). It ain't gospel.
+
+### Executing BTs
+
+#### Use explicit exit conditions
+
+- Return `error` to handle failures that should terminate tree execution
+- BTs that "run until completion" may be implemented using `NewTickerStopOnFailure` (internally it just returns
+  an error then strips any occurrence of that that error from the ticker's result)
+- Panics may be used as normal, and are suitable for cases such unrecoverable errors that _shouldn't_ happen
+
+### Shared state
+
+#### `Tick` implementations should be grouped in a way that makes sense, in the context of any shared state
+
+- It may be convenient to expose a group of `Tick` prototypes with shared state as methods of a struct
+- Global state should be avoided for all the regular reasons, but especially since it defeats a lot of the point
+  of having modular, composable behavior
+
+#### Encapsulate `Tick` implementations, rather than `Node`
+
+- Children may be may be modified, but only until the (outer) `Tick` returns it's next non-running status
+- This mechanism _theoretically_ facilitates dynamically generated trees while simultaneously supporting more complex
+  / concurrency-heavy implementations made up of reusable building blocks
+
+## Roadmap
+
+I am actively maintaining this project, and will be for the foreseeable future. It has been "feature complete" for
+some time though, so additional functionality will assessed on a case-by-case basis.
 
 ## Example Usage
 
@@ -76,8 +119,8 @@ func ExampleNewTickerStopOnFailure_counter() {
 				return Success, nil
 			},
 		)
-		// ticker is what actually runs this example and will tick the behavior tree defined by a single root node at
-		// most once per millisecond and will stop after the first failed tick or error or context cancel
+		// ticker is what actually runs this example and will tick the behavior tree defined by a given node at a given
+		// rate and will stop after the first failed tick or error or context cancel
 		ticker = NewTickerStopOnFailure(
 			context.Background(),
 			time.Millisecond,
@@ -139,6 +182,104 @@ func ExampleNewTickerStopOnFailure_counter() {
 	// < 20: 18
 	// < 20: 19
 	// < 20: 20
+}
+
+// ExampleMemorize_cancellationWithContextCancel demonstrates how support for reactive logic that uses context can
+// be implemented
+func ExampleMemorize_cancellationWithContextCancel() {
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+		debug  = func(label string, tick Tick) Tick {
+			return func(children []Node) (status Status, err error) {
+				status, err = tick(children)
+				fmt.Printf("%s returned (%v, %v)\n", label, status, err)
+				return
+			}
+		}
+		recorded = func(statuses ...Status) Tick {
+			return func([]Node) (status Status, err error) {
+				status = statuses[0]
+				statuses = statuses[1:]
+				return
+			}
+		}
+		counter int
+		ticker  = NewTickerStopOnFailure(
+			context.Background(),
+			time.Millisecond,
+			New(
+				All,
+				New(
+					Memorize(debug(`memorized`, All)),
+					New(func([]Node) (Status, error) {
+						counter++
+						ctx, cancel = context.WithCancel(context.WithValue(context.Background(), `n`, counter))
+						return Success, nil
+					}), // prepare the context
+					New(
+						debug(`sequence`, Sequence),
+						New(debug(`guard`, recorded(
+							Success,
+							Success,
+							Success,
+							Success,
+							Failure,
+						))),
+						New(func([]Node) (Status, error) {
+							fmt.Printf("[start action] context #%d's err=%v\n", ctx.Value(`n`), ctx.Err())
+							return Success, nil
+						}),
+						New(debug(`action`, recorded(
+							Running,
+							Running,
+							Success,
+							Running,
+						))),
+					),
+					New(func([]Node) (Status, error) {
+						cancel()
+						return Success, nil
+					}), // cancel the context
+				),
+				New(func([]Node) (Status, error) {
+					fmt.Printf("[end memorized] context #%d's err=%v\n", ctx.Value(`n`), ctx.Err())
+					return Success, nil
+				}),
+			),
+		)
+	)
+
+	<-ticker.Done()
+	if err := ticker.Err(); err != nil {
+		panic(err)
+	}
+	//output:
+	//guard returned (success, <nil>)
+	//[start action] context #1's err=<nil>
+	//action returned (running, <nil>)
+	//sequence returned (running, <nil>)
+	//memorized returned (running, <nil>)
+	//guard returned (success, <nil>)
+	//[start action] context #1's err=<nil>
+	//action returned (running, <nil>)
+	//sequence returned (running, <nil>)
+	//memorized returned (running, <nil>)
+	//guard returned (success, <nil>)
+	//[start action] context #1's err=<nil>
+	//action returned (success, <nil>)
+	//sequence returned (success, <nil>)
+	//memorized returned (success, <nil>)
+	//[end memorized] context #1's err=context canceled
+	//guard returned (success, <nil>)
+	//[start action] context #2's err=<nil>
+	//action returned (running, <nil>)
+	//sequence returned (running, <nil>)
+	//memorized returned (running, <nil>)
+	//guard returned (failure, <nil>)
+	//sequence returned (failure, <nil>)
+	//memorized returned (failure, <nil>)
+	//[end memorized] context #2's err=context canceled
 }
 
 // ExampleBackground_asyncJobQueue implements a basic example of backgrounding of long-running tasks that may be

@@ -110,6 +110,105 @@ func ExampleNewTickerStopOnFailure_counter() {
 	// < 20: 20
 }
 
+// ExampleMemorize_cancellationWithContextCancel demonstrates how support for reactive logic that uses context can
+// be implemented
+func ExampleMemorize_cancellationWithContextCancel() {
+	type Str string
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+		debug  = func(label string, tick Tick) Tick {
+			return func(children []Node) (status Status, err error) {
+				status, err = tick(children)
+				fmt.Printf("%s returned (%v, %v)\n", label, status, err)
+				return
+			}
+		}
+		recorded = func(statuses ...Status) Tick {
+			return func([]Node) (status Status, err error) {
+				status = statuses[0]
+				statuses = statuses[1:]
+				return
+			}
+		}
+		counter int
+		ticker  = NewTickerStopOnFailure(
+			context.Background(),
+			time.Millisecond,
+			New(
+				All,
+				New(
+					Memorize(debug(`memorized`, All)),
+					New(func([]Node) (Status, error) {
+						counter++
+						ctx, cancel = context.WithCancel(context.WithValue(context.Background(), Str(`n`), counter))
+						return Success, nil
+					}), // prepare the context
+					New(
+						debug(`sequence`, Sequence),
+						New(debug(`guard`, recorded(
+							Success,
+							Success,
+							Success,
+							Success,
+							Failure,
+						))),
+						New(func([]Node) (Status, error) {
+							fmt.Printf("[start action] context #%d's err=%v\n", ctx.Value(Str(`n`)), ctx.Err())
+							return Success, nil
+						}),
+						New(debug(`action`, recorded(
+							Running,
+							Running,
+							Success,
+							Running,
+						))),
+					),
+					New(func([]Node) (Status, error) {
+						cancel()
+						return Success, nil
+					}), // cancel the context
+				),
+				New(func([]Node) (Status, error) {
+					fmt.Printf("[end memorized] context #%d's err=%v\n", ctx.Value(Str(`n`)), ctx.Err())
+					return Success, nil
+				}),
+			),
+		)
+	)
+
+	<-ticker.Done()
+	if err := ticker.Err(); err != nil {
+		panic(err)
+	}
+	//output:
+	//guard returned (success, <nil>)
+	//[start action] context #1's err=<nil>
+	//action returned (running, <nil>)
+	//sequence returned (running, <nil>)
+	//memorized returned (running, <nil>)
+	//guard returned (success, <nil>)
+	//[start action] context #1's err=<nil>
+	//action returned (running, <nil>)
+	//sequence returned (running, <nil>)
+	//memorized returned (running, <nil>)
+	//guard returned (success, <nil>)
+	//[start action] context #1's err=<nil>
+	//action returned (success, <nil>)
+	//sequence returned (success, <nil>)
+	//memorized returned (success, <nil>)
+	//[end memorized] context #1's err=context canceled
+	//guard returned (success, <nil>)
+	//[start action] context #2's err=<nil>
+	//action returned (running, <nil>)
+	//sequence returned (running, <nil>)
+	//memorized returned (running, <nil>)
+	//guard returned (failure, <nil>)
+	//sequence returned (failure, <nil>)
+	//memorized returned (failure, <nil>)
+	//[end memorized] context #2's err=context canceled
+}
+
 // ExampleBackground_asyncJobQueue implements a basic example of backgrounding of long-running tasks that may be
 // performed concurrently, see ExampleNewTickerStopOnFailure_counter for an explanation of the ticker
 func ExampleBackground_asyncJobQueue() {
