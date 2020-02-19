@@ -19,7 +19,9 @@ package behaviortree
 import "sync"
 
 // Sync will wrap a set of nodes in such a way that their real ticks will only be triggered when either the node
-// being ticked was previously running, or no other nodes are running.
+// being ticked was previously running, or no other nodes are running, synchronising calling their Node and Tick calls.
+//
+// NOTE the Memorize function provides similar functionality, and should be preferred, where both are suitable.
 func Sync(nodes []Node) []Node {
 	if nodes == nil {
 		return nil
