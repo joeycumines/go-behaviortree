@@ -43,16 +43,40 @@ type (
 	Status int
 )
 
-// New constructs a new behavior tree aliasing NewNode with vararg support for less indentation
-func New(tick Tick, children ...Node) Node {
-	return NewNode(tick, children)
-}
+// New constructs a new behavior tree and is equivalent to NewNode with vararg support for less indentation
+func New(tick Tick, children ...Node) Node { return factory(tick, children) }
 
 // NewNode constructs a new node out of a tick and children
-func NewNode(tick Tick, children []Node) Node {
-	return func() (Tick, []Node) {
+func NewNode(tick Tick, children []Node) Node { return factory(tick, children) }
+
+var factory = func(tick Tick, children []Node) (node Node) {
+	var (
+		frame *Frame
+	)
+	if v := make([]uintptr, 1); runtimeCallers(3, v[:]) >= 1 {
+		if v, _ := runtimeCallersFrames(v).Next(); v.PC != 0 {
+			frame = &Frame{
+				PC:       v.PC,
+				Function: v.Function,
+				File:     v.File,
+				Line:     v.Line,
+				Entry:    v.Entry,
+			}
+		}
+	}
+	node = func() (Tick, []Node) {
+		if frame != nil {
+			node.valueHandle(func(key interface{}) (interface{}, bool) {
+				if key != (vkFrame{}) {
+					return nil, false
+				}
+				frame := *frame
+				return &frame, true
+			})
+		}
 		return tick, children
 	}
+	return
 }
 
 // Tick runs the node's tick function with it's children

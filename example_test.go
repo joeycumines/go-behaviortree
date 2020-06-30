@@ -23,9 +23,7 @@ import (
 	"time"
 )
 
-// ExampleNewTickerStopOnFailure_counter demonstrates the use of NewTickerStopOnFailure to implement more complex "run
-// to completion" behavior using the simple modular building blocks provided by this package
-func ExampleNewTickerStopOnFailure_counter() {
+func newExampleCounter() Node {
 	var (
 		// counter is the shared state used by this example
 		counter = 0
@@ -45,41 +43,47 @@ func ExampleNewTickerStopOnFailure_counter() {
 				return Success, nil
 			},
 		)
-		// ticker is what actually runs this example and will tick the behavior tree defined by a given node at a given
-		// rate and will stop after the first failed tick or error or context cancel
-		ticker = NewTickerStopOnFailure(
-			context.Background(),
-			time.Millisecond,
+	)
+	return New(
+		Selector, // runs each child sequentially until one succeeds (success) or all fail (failure)
+		New(
+			Sequence, // runs each child in order until one fails (failure) or they all succeed (success)
 			New(
-				Selector, // runs each child sequentially until one succeeds (success) or all fail (failure)
-				New(
-					Sequence, // runs each child in order until one fails (failure) or they all succeed (success)
-					New(
-						func(children []Node) (Status, error) { // succeeds while counter is less than 10
-							if counter < 10 {
-								return Success, nil
-							}
-							return Failure, nil
-						},
-					),
-					incrementCounter,
-					printCounter("< 10"),
-				),
-				New(
-					Sequence,
-					New(
-						func(children []Node) (Status, error) { // succeeds while counter is less than 20
-							if counter < 20 {
-								return Success, nil
-							}
-							return Failure, nil
-						},
-					),
-					incrementCounter,
-					printCounter("< 20"),
-				),
-			), // if both children failed (counter is >= 20) the root node will also fail
-		)
+				func(children []Node) (Status, error) { // succeeds while counter is less than 10
+					if counter < 10 {
+						return Success, nil
+					}
+					return Failure, nil
+				},
+			),
+			incrementCounter,
+			printCounter("< 10"),
+		),
+		New(
+			Sequence,
+			New(
+				func(children []Node) (Status, error) { // succeeds while counter is less than 20
+					if counter < 20 {
+						return Success, nil
+					}
+					return Failure, nil
+				},
+			),
+			incrementCounter,
+			printCounter("< 20"),
+		),
+	) // if both children failed (counter is >= 20) the root node will also fail
+}
+
+// ExampleNewTickerStopOnFailure_counter demonstrates the use of NewTickerStopOnFailure to implement more complex "run
+// to completion" behavior using the simple modular building blocks provided by this package
+func ExampleNewTickerStopOnFailure_counter() {
+	// ticker is what actually runs this example and will tick the behavior tree defined by a given node at a given
+	// rate and will stop after the first failed tick or error or context cancel
+	ticker := NewTickerStopOnFailure(
+		context.Background(),
+		time.Millisecond,
+		newExampleCounter(),
 	)
 	// waits until ticker stops, which will be on the first failure of it's root node
 	<-ticker.Done()

@@ -31,6 +31,7 @@ func TestNode_Tick_nil(t *testing.T) {
 
 	var tree Node
 
+	//noinspection GoNilness
 	status, err = tree.Tick()
 
 	if status != Failure {
@@ -192,5 +193,71 @@ func TestStatus_Status(t *testing.T) {
 		if actual := testCase.Status.Status(); actual != testCase.Expected {
 			t.Errorf("%s failed: expected behaviortree.Status.Status '%s' != actual '%s'", name, testCase.Status, actual)
 		}
+	}
+}
+
+func genTestNewFrame() *Frame { return New(Sequence).Frame() }
+
+func TestNew_frame(t *testing.T) {
+	var (
+		expected = newFrame(genTestNewFrame)
+		actual   = genTestNewFrame()
+	)
+	if expected == nil || actual == nil || expected.PC == 0 || actual.PC == 0 || expected.PC != expected.Entry || actual.PC == actual.Entry {
+		t.Fatal(expected, actual)
+	}
+	actual.PC = actual.Entry
+	if *expected != *actual {
+		t.Errorf("expected != actual\nEXPECTED: %#v\nACTUAL: %#v", expected, actual)
+	}
+}
+
+func genTestNewNodeFrame() *Frame { return NewNode(Sequence, nil).Frame() }
+
+func TestNewNode_frame(t *testing.T) {
+	var (
+		expected = newFrame(genTestNewNodeFrame)
+		actual   = genTestNewNodeFrame()
+	)
+	if expected == nil || actual == nil || expected.PC == 0 || actual.PC == 0 || expected.PC != expected.Entry || actual.PC == actual.Entry {
+		t.Fatal(expected, actual)
+	}
+	actual.PC = actual.Entry
+	if *expected != *actual {
+		t.Errorf("expected != actual\nEXPECTED: %#v\nACTUAL: %#v", expected, actual)
+	}
+}
+
+func Test_factory_nilFrame(t *testing.T) {
+	if v := New(nil).Value(vkFrame{}); v == nil {
+		t.Error(v)
+	}
+	if v := New(nil).Value(1); v != nil {
+		t.Error(v)
+	}
+	if v := NewNode(nil, nil).Value(vkFrame{}); v == nil {
+		t.Error(v)
+	}
+	if v := NewNode(nil, nil).Value(1); v != nil {
+		t.Error(v)
+	}
+	defer func() func() {
+		old := runtimeCallers
+		runtimeCallers = func(skip int, pc []uintptr) int { return 0 }
+		return func() {
+			runtimeCallers = old
+		}
+	}()()
+	if v := New(nil).Value(vkFrame{}); v != nil {
+		t.Error(v)
+	}
+	if v := New(nil).Value(1); v != nil {
+		t.Error(v)
+	}
+	if v := NewNode(nil, nil).Value(vkFrame{}); v != nil {
+		t.Error(v)
+	}
+	if v := NewNode(nil, nil).Value(1); v != nil {
+		t.Error(v)
 	}
 }
