@@ -48,8 +48,9 @@ finite state machines, which tends to cripple the modularity of any interruptabl
 it's own exit condition(s). Golang's `context` doesn't really help in that case, either, being a communication
 mechanism, rather than a control mechanism. As an alternative, implementations may use pre-conditions (preceding
 child(ren) in a sequence), guarding an asynchronous tick. Context support may be desirable, and may be implemented as
-`Tick` implementations(s). Context support is peripheral in that it's only relevant to a subset of implementations,
-and was deliberately omitted (from `Tick`).
+`Tick` implementations(s). This package provides a `Context` implementation to address several common use cases, such
+as operations with timeouts. Context support is peripheral in that it's only relevant to a subset of implementations,
+and was deliberately omitted from the core `Tick` type.
 
 ### Modularity
 
@@ -429,5 +430,117 @@ func ExampleBackground_asyncJobQueue() {
 	//[worker] job "3. 150ms" FINISHED
 	//[client] job "3. 150ms" FINISHED
 	//running jobs: 0
+}
+
+
+// ExampleContext demonstrates how the Context implementation may be used to integrate with the context package
+func ExampleContext() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var (
+		btCtx = new(Context).WithTimeout(ctx, time.Millisecond*100)
+		debug = func(args ...interface{}) Tick {
+			return func([]Node) (Status, error) {
+				fmt.Println(args...)
+				return Success, nil
+			}
+		}
+		counter      int
+		counterEqual = func(v int) Tick {
+			return func([]Node) (Status, error) {
+				if counter == v {
+					return Success, nil
+				}
+				return Failure, nil
+			}
+		}
+		counterInc Tick = func([]Node) (Status, error) {
+			counter++
+			//fmt.Printf("counter = %d\n", counter)
+			return Success, nil
+		}
+		ticker = NewTicker(ctx, time.Millisecond, New(
+			Sequence,
+			New(
+				Selector,
+				New(Not(btCtx.Err)),
+				New(
+					Sequence,
+					New(debug(`(re)initialising btCtx...`)),
+					New(btCtx.Init),
+					New(Not(btCtx.Err)),
+				),
+			),
+			New(
+				Selector,
+				New(
+					Sequence,
+					New(counterEqual(0)),
+					New(debug(`blocking on context-enabled tick...`)),
+					New(
+						btCtx.Tick(func(ctx context.Context, children []Node) (Status, error) {
+							fmt.Printf("NOTE children (%d) passed through\n", len(children))
+							<-ctx.Done()
+							return Success, nil
+						}),
+						New(Sequence),
+						New(Sequence),
+					),
+					New(counterInc),
+				),
+				New(
+					Sequence,
+					New(counterEqual(1)),
+					New(debug(`blocking on done...`)),
+					New(btCtx.Done),
+					New(counterInc),
+				),
+				New(
+					Sequence,
+					New(counterEqual(2)),
+					New(debug(`canceling local then rechecking the above...`)),
+					New(btCtx.Cancel),
+					New(btCtx.Err),
+					New(btCtx.Tick(func(ctx context.Context, children []Node) (Status, error) {
+						<-ctx.Done()
+						return Success, nil
+					})),
+					New(btCtx.Done),
+					New(counterInc),
+				),
+				New(
+					Sequence,
+					New(counterEqual(3)),
+					New(debug(`canceling parent then rechecking the above...`)),
+					New(func([]Node) (Status, error) {
+						cancel()
+						return Success, nil
+					}),
+					New(btCtx.Err),
+					New(btCtx.Tick(func(ctx context.Context, children []Node) (Status, error) {
+						<-ctx.Done()
+						return Success, nil
+					})),
+					New(btCtx.Done),
+					New(debug(`exiting...`)),
+				),
+			),
+		))
+	)
+
+	<-ticker.Done()
+
+	//output:
+	//(re)initialising btCtx...
+	//blocking on context-enabled tick...
+	//NOTE children (2) passed through
+	//(re)initialising btCtx...
+	//blocking on done...
+	//(re)initialising btCtx...
+	//canceling local then rechecking the above...
+	//(re)initialising btCtx...
+	//canceling parent then rechecking the above...
+	//exiting...
 }
 ```
