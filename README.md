@@ -24,6 +24,16 @@ type (
 func (n Node) Tick() (Status, error)
 ```
 
+## Features
+
+- Core behavior tree implementation (the types above + `Sequence` and `Selector`)
+- Tools to aide implementation of "reactive" behavior trees (`Memorize`, `Async`, `Sync`)
+- Implementations to run and manage behavior trees (`NewManager`, `NewTicker`)
+- Collection of `Tick` implementations / wrappers (targeting various use cases)
+- Context-like mechanism to attach metadata to `Node` values that can transit API boundaries / encapsulation
+- Basic tree debugging capabilities via implementation of `fmt.Stringer` (see also `DefaultPrinter`, `Node.Frame`)
+- Experimental support for the PA-BT planning algorithm via [github.com/joeycumines/go-pabt](https://github.com/joeycumines/go-pabt)
+
 ## Design
 
 This library provides an implementation of the generalised behavior tree pattern. The three types above along with the
