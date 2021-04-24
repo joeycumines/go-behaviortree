@@ -27,7 +27,7 @@ func Sequence(children []Node) (Status, error) {
 		if status == Running {
 			return Running, nil
 		}
-		if status == Failure {
+		if status != Success {
 			return Failure, nil
 		}
 	}

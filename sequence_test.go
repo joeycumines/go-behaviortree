@@ -258,3 +258,26 @@ func TestSequence_running(t *testing.T) {
 		t.Error("expected nil error but it was", err)
 	}
 }
+
+func TestSequence_invalidStatus(t *testing.T) {
+	var (
+		output   []int
+		children []Node
+	)
+	for i := 0; i < 6; i++ {
+		i := i
+		children = append(children, New(func([]Node) (Status, error) {
+			output = append(output, i)
+			if i == 3 {
+				return 0, nil
+			}
+			return Success, nil
+		}))
+	}
+	if status, err := NewNode(Sequence, children).Tick(); err != nil || status != Failure {
+		t.Error(status, err)
+	}
+	if diff := deep.Equal(output, []int{0, 1, 2, 3}); diff != nil {
+		t.Errorf("%v\n%s", output, strings.Join(diff, "\n"))
+	}
+}

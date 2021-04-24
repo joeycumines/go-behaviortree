@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	_ = iota
+	_ Status = iota
 	// Running indicates that the Tick for a given Node is currently running
-	Running Status = iota
+	Running
 	// Success indicates that the Tick for a given Node completed successfully
 	Success
 	// Failure indicates that the Tick for a given Node failed to complete successfully

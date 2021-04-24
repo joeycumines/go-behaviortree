@@ -207,7 +207,7 @@ func TestNewTicker_runError(t *testing.T) {
 func TestNewTicker_runCancel(t *testing.T) {
 	startGoroutines := runtime.NumGoroutine()
 	defer func() {
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 100)
 
 		endGoroutines := runtime.NumGoroutine()
 
@@ -226,7 +226,7 @@ func TestNewTicker_runCancel(t *testing.T) {
 	startedAt := time.Now()
 	defer func() {
 		diff := time.Now().Sub(startedAt)
-		if diff > time.Millisecond*20 {
+		if diff > time.Millisecond*100 {
 			t.Error("unexpected diff", diff)
 		}
 	}()
