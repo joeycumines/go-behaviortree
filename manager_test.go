@@ -20,19 +20,175 @@ import (
 	"errors"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-func TestNewManager(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
+func TestManager_Stop_raceCloseDone(t *testing.T) {
+	defer checkGoroutines(t)(false, time.Millisecond*100)
+	m := NewManager().(*manager)
+	close(m.done)
+	m.Stop()
+}
+
+func TestManager_Stop_noTickers(t *testing.T) {
+	defer checkGoroutines(t)(false, time.Millisecond*100)
+	m := NewManager()
+	if err := m.Err(); err != nil {
+		t.Error(err)
+	}
+	select {
+	case <-m.Done():
+		t.Error()
+	default:
+	}
+	m.Stop()
+	if err := m.Err(); err != nil {
+		t.Error(err)
+	}
+	<-m.Done()
+	if err := m.Err(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestManager_Add_whileStopping(t *testing.T) {
+	defer checkGoroutines(t)(false, time.Millisecond*100)
+	m := NewManager()
+	for i := 0; i < 10; i++ {
+		if err := m.Add(NewManager()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var (
+		wg      sync.WaitGroup
+		count   int64
+		done    int32
+		stopped int32
+	)
+	wg.Add(8)
 	defer func() {
-		time.Sleep(time.Millisecond * 100)
-		endGoroutines := runtime.NumGoroutine()
-		if startGoroutines < endGoroutines {
-			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
+		atomic.AddInt64(&count, -atomic.LoadInt64(&count))
+		m.Stop()
+		atomic.StoreInt32(&stopped, 1)
+		time.Sleep(time.Millisecond * 50)
+		atomic.StoreInt32(&done, 1)
+		wg.Wait()
+		<-m.Done()
+		if err := m.Err(); err != nil {
+			t.Error(err)
+		}
+		count := atomic.LoadInt64(&count)
+		t.Log(count)
+		if count < 15 {
+			t.Error(count)
 		}
 	}()
+	for i := 0; i < 8; i++ {
+		go func() {
+			defer wg.Done()
+			for atomic.LoadInt32(&done) == 0 {
+				var (
+					stoppedBefore = atomic.LoadInt32(&stopped) != 0
+					err           = m.Add(NewManager())
+					stoppedAfter  = atomic.LoadInt32(&stopped) != 0
+				)
+				if err != nil && err != ErrManagerStopped {
+					t.Error(err)
+				}
+				if stoppedBefore && !stoppedAfter {
+					t.Error()
+				}
+				if stoppedBefore && err == nil {
+					t.Error()
+				}
+				atomic.AddInt64(&count, 1)
+				time.Sleep(time.Millisecond)
+			}
+		}()
+	}
+	time.Sleep(time.Millisecond * 20)
+}
+
+func TestManager_Add_secondStopCase(t *testing.T) {
+	defer checkGoroutines(t)(false, time.Millisecond*100)
+	out := make(chan error)
+	defer close(out)
+	done := make(chan struct{})
+	stop := make(chan struct{})
+	go func() { out <- (&manager{stop: stop, done: done}).Add(mockTicker{}) }()
+	time.Sleep(time.Millisecond * 100)
+	select {
+	case err := <-out:
+		t.Fatal(err)
+	default:
+	}
+	close(stop)
+	if err := <-out; err != ErrManagerStopped {
+		t.Error(err)
+	}
+	<-done
+}
+
+func TestManager_Stop_cleanupGoroutines(t *testing.T) {
+	check := checkGoroutines(t)
+	defer check(false, time.Millisecond*100)
+
+	m := NewManager()
+
+	{
+		// add a ticker then stop it, then verify that all resources (goroutines) are cleaned up
+		check(false, 0)
+		done := make(chan struct{})
+		if err := m.Add(mockTicker{
+			done: func() <-chan struct{} { return done },
+			err:  func() error { return nil },
+			stop: func() {},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		check(true, 0)
+		close(done)
+		check(false, time.Millisecond*50)
+		if err := m.Err(); err != nil {
+			t.Error(err)
+		}
+		select {
+		case <-m.Done():
+			t.Fatal()
+		default:
+		}
+	}
+
+	{
+		// add two tickers (one multiple times), then stop one, then the other
+		var (
+			m1 = NewManager()
+			m2 = NewManager()
+		)
+		check(false, 0)
+		for i := 0; i < 30; i++ {
+			if err := m.Add(m1); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := m.Add(m2); err != nil {
+			t.Fatal(err)
+		}
+		check(true, time.Millisecond*50)
+		gr := runtime.NumGoroutine()
+		m1.Stop()
+		check(true, time.Millisecond*50)
+		if diff := runtime.NumGoroutine() - gr + 1; diff > 0 {
+			t.Errorf("too many goroutines: +%d", diff)
+		}
+		m2.Stop()
+	}
+}
+
+func TestNewManager(t *testing.T) {
+	defer checkGoroutines(t)(false, time.Millisecond*100)
 
 	m := NewManager().(*manager)
 
@@ -96,8 +252,21 @@ func TestNewManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(m.tickers) != 2 || len(m.errs) != 0 || m.stopped {
-		t.Fatal(m)
+	if d := m.Done(); d != m.done || d == nil {
+		t.Error(d)
+	}
+	if err := m.Err(); err != nil {
+		t.Error(err)
+	}
+	select {
+	case <-m.stop:
+		t.Error()
+	default:
+	}
+	select {
+	case <-m.done:
+		t.Error()
+	default:
 	}
 
 	mutex.Lock()
@@ -127,22 +296,58 @@ func TestNewManager(t *testing.T) {
 
 	<-m.Done()
 
-	if len(m.tickers) != 0 {
-		t.Error(m.tickers)
+	checkErrTicker := func(err error) {
+		t.Helper()
+		if err == nil || err.Error() != "some_error | other_error" {
+			t.Error(err)
+		}
+		if !errors.Is(err, err1) {
+			t.Error(err)
+		}
+		if !errors.Is(err, err2) {
+			t.Error(err)
+		}
+		if errors.Is(err, errors.New(`another_error`)) {
+			t.Error(err)
+		}
+		{
+			err := err
+			if v, ok := err.(errManagerStopped); ok {
+				err = v.Unwrap()
+			}
+			if v, ok := err.(errManagerTicker); !ok || len(v) != 2 {
+				t.Error(err)
+			}
+		}
+	}
+	checkErrStopped := func(err error) {
+		t.Helper()
+		if !errors.Is(err.(errManagerStopped), ErrManagerStopped.(errManagerStopped)) ||
+			!(errManagerStopped{}).Is(err) ||
+			!err.(interface{ Is(error) bool }).Is(errManagerStopped{}) {
+			t.Error(err)
+		}
 	}
 
-	if err := m.Err(); err == nil || err.Error() != "some_error | other_error" {
-		t.Error(err)
+	checkErrTicker(m.Err())
+	{
+		err := m.Add(mockTicker{})
+		checkErrTicker(err)
+		checkErrStopped(err)
 	}
 
 	// does nothing
 	m.Stop()
 
-	if err := m.Add(mockTicker{}); err == nil {
-		t.Error("expected error")
+	checkErrTicker(m.Err())
+	{
+		err := m.Add(mockTicker{})
+		checkErrTicker(err)
+		checkErrStopped(err)
 	}
+
 	m.errs = nil
-	if err := m.Add(mockTicker{}); err == nil {
+	if err := m.Add(mockTicker{}); err != ErrManagerStopped {
 		t.Error("expected error")
 	}
 	if err := m.Add(nil); err == nil {
@@ -176,4 +381,20 @@ func (m mockTicker) Stop() {
 		return
 	}
 	panic("implement me")
+}
+
+func checkGoroutines(t *testing.T) func(increase bool, wait time.Duration) {
+	t.Helper()
+	start := runtime.NumGoroutine()
+	return func(increase bool, wait time.Duration) {
+		t.Helper()
+		time.Sleep(wait)
+		if now := runtime.NumGoroutine(); increase {
+			if start >= now {
+				t.Errorf("too few goroutines: -%d", start-now+1)
+			}
+		} else if start < now {
+			t.Errorf("too many goroutines: +%d", now-start)
+		}
+	}
 }

@@ -234,7 +234,9 @@ func TestDefaultPrinterInspector_noName(t *testing.T) {
 
 func TestTreePrinter_Fprint_emptyMeta(t *testing.T) {
 	p := TreePrinter{
-		Inspector: func(node Node, tick Tick) (meta []interface{}, value interface{}) { return []interface{}{``, ``, ``}, `` },
+		Inspector: func(node Node, tick Tick) (meta []interface{}, value interface{}) {
+			return []interface{}{``, ``, ``}, ``
+		},
 		Formatter: DefaultPrinterFormatter,
 	}
 	b := new(bytes.Buffer)
