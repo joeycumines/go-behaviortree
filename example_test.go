@@ -241,7 +241,7 @@ func ExampleBackground_asyncJobQueue() {
 			queue <- job
 			<-job.Done
 			fmt.Printf("[client] job \"%s\" FINISHED\n", job.Name)
-			t := time.Now().Sub(ts)
+			t := time.Since(ts)
 			d := t - job.Duration
 			if d < 0 {
 				d *= -1

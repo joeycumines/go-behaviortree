@@ -62,7 +62,7 @@ func (n Node) String() string {
 	if err := DefaultPrinter.Fprint(&b, n); err != nil {
 		return fmt.Sprintf(`behaviortree.DefaultPrinter error: %s`, err)
 	}
-	return string(b.Bytes())
+	return b.String()
 }
 
 // DefaultPrinterFormatter is used by DefaultPrinter
