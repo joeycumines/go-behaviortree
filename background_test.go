@@ -19,21 +19,12 @@ package behaviortree
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 )
 
 func ExampleBackground_success() {
-	defer func() func() {
-		start := runtime.NumGoroutine()
-		return func() {
-			end := runtime.NumGoroutine()
-			if start < end {
-				panic(fmt.Errorf("num. goroutines %v start < end %v", start, end))
-			}
-		}
-	}()()
+	defer checkNumGoroutines(nil)(false, 0)
 	node := func() Node {
 		tick := Background(Fork)
 		return func() (Tick, []Node) {
@@ -98,15 +89,7 @@ func ExampleBackground_success() {
 }
 
 func TestBackground(t *testing.T) {
-	defer func() func() {
-		start := runtime.NumGoroutine()
-		return func() {
-			end := runtime.NumGoroutine()
-			if start < end {
-				panic(fmt.Errorf("num. goroutines %v start < end %v", start, end))
-			}
-		}
-	}()()
+	defer checkNumGoroutines(t)(false, 0)
 
 	var (
 		status Status
@@ -140,15 +123,7 @@ func TestBackground_nilTick(t *testing.T) {
 }
 
 func TestBackground_withAny(t *testing.T) {
-	defer func() func() {
-		start := runtime.NumGoroutine()
-		return func() {
-			end := runtime.NumGoroutine()
-			if start > end {
-				t.Error(start, end)
-			}
-		}
-	}()()
+	defer checkNumGoroutines(t)(false, 0)
 
 	var (
 		tick = Background(func() Tick {

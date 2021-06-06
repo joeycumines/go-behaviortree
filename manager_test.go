@@ -18,6 +18,7 @@ package behaviortree
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -26,14 +27,14 @@ import (
 )
 
 func TestManager_Stop_raceCloseDone(t *testing.T) {
-	defer checkGoroutines(t)(false, time.Millisecond*100)
+	defer checkNumGoroutines(t)(false, 0)
 	m := NewManager().(*manager)
 	close(m.done)
 	m.Stop()
 }
 
 func TestManager_Stop_noTickers(t *testing.T) {
-	defer checkGoroutines(t)(false, time.Millisecond*100)
+	defer checkNumGoroutines(t)(false, 0)
 	m := NewManager()
 	if err := m.Err(); err != nil {
 		t.Error(err)
@@ -54,7 +55,7 @@ func TestManager_Stop_noTickers(t *testing.T) {
 }
 
 func TestManager_Add_whileStopping(t *testing.T) {
-	defer checkGoroutines(t)(false, time.Millisecond*100)
+	defer checkNumGoroutines(t)(false, 0)
 	m := NewManager()
 	for i := 0; i < 10; i++ {
 		if err := m.Add(NewManager()); err != nil {
@@ -112,7 +113,7 @@ func TestManager_Add_whileStopping(t *testing.T) {
 }
 
 func TestManager_Add_secondStopCase(t *testing.T) {
-	defer checkGoroutines(t)(false, time.Millisecond*100)
+	defer checkNumGoroutines(t)(false, 0)
 	out := make(chan error)
 	defer close(out)
 	done := make(chan struct{})
@@ -132,8 +133,8 @@ func TestManager_Add_secondStopCase(t *testing.T) {
 }
 
 func TestManager_Stop_cleanupGoroutines(t *testing.T) {
-	check := checkGoroutines(t)
-	defer check(false, time.Millisecond*100)
+	check := checkNumGoroutines(t)
+	defer check(false, 0)
 
 	m := NewManager()
 
@@ -150,7 +151,7 @@ func TestManager_Stop_cleanupGoroutines(t *testing.T) {
 		}
 		check(true, 0)
 		close(done)
-		check(false, time.Millisecond*50)
+		check(false, 0)
 		if err := m.Err(); err != nil {
 			t.Error(err)
 		}
@@ -176,11 +177,10 @@ func TestManager_Stop_cleanupGoroutines(t *testing.T) {
 		if err := m.Add(m2); err != nil {
 			t.Fatal(err)
 		}
-		check(true, time.Millisecond*50)
+		check(true, 0)
 		gr := runtime.NumGoroutine()
 		m1.Stop()
-		check(true, time.Millisecond*50)
-		if diff := runtime.NumGoroutine() - gr + 1; diff > 0 {
+		if diff := waitNumGoroutines(0, func(n int) bool { return (n - gr + 1) <= 0 }) - gr + 1; diff > 0 {
 			t.Errorf("too many goroutines: +%d", diff)
 		}
 		m2.Stop()
@@ -188,7 +188,7 @@ func TestManager_Stop_cleanupGoroutines(t *testing.T) {
 }
 
 func TestNewManager(t *testing.T) {
-	defer checkGoroutines(t)(false, time.Millisecond*100)
+	defer checkNumGoroutines(t)(false, 0)
 
 	m := NewManager().(*manager)
 
@@ -383,18 +383,65 @@ func (m mockTicker) Stop() {
 	panic("implement me")
 }
 
-func checkGoroutines(t *testing.T) func(increase bool, wait time.Duration) {
-	t.Helper()
-	start := runtime.NumGoroutine()
-	return func(increase bool, wait time.Duration) {
-		t.Helper()
+const (
+	waitNumGoroutinesDefault     = time.Millisecond * 200
+	waitNumGoroutinesNumerator   = 1
+	waitNumGoroutinesDenominator = 1
+	waitNumGoroutinesMin         = time.Millisecond * 50
+)
+
+func waitNumGoroutines(wait time.Duration, fn func(n int) bool) (n int) {
+	if wait == 0 {
+		wait = waitNumGoroutinesDefault
+	}
+	wait *= waitNumGoroutinesNumerator
+	wait /= waitNumGoroutinesDenominator
+	if wait < waitNumGoroutinesMin {
+		wait = waitNumGoroutinesMin
+	}
+	count := int(wait / waitNumGoroutinesMin)
+	wait /= time.Duration(count)
+	n = runtime.NumGoroutine()
+	for i := 0; i < count && !fn(n); i++ {
 		time.Sleep(wait)
-		if now := runtime.NumGoroutine(); increase {
+		runtime.GC()
+		n = runtime.NumGoroutine()
+	}
+	return
+}
+
+// checkNumGoroutines is used to indirectly test goroutine state / cleanup, the reliance on timing isn't great, but I
+// wasn't able to come up with a better solution
+func checkNumGoroutines(t *testing.T) func(increase bool, wait time.Duration) {
+	if t != nil {
+		t.Helper()
+	}
+	var (
+		errorf = func(format string, values ...interface{}) {
+			if err := fmt.Errorf(format, values...); t != nil {
+				t.Error(err)
+			} else {
+				panic(err)
+			}
+		}
+		start = runtime.NumGoroutine()
+	)
+	return func(increase bool, wait time.Duration) {
+		if t != nil {
+			t.Helper()
+		}
+		var fn func(n int) bool
+		if increase {
+			fn = func(n int) bool { return start < n }
+		} else {
+			fn = func(n int) bool { return start >= n }
+		}
+		if now := waitNumGoroutines(wait, fn); increase {
 			if start >= now {
-				t.Errorf("too few goroutines: -%d", start-now+1)
+				errorf("too few goroutines: -%d", start-now+1)
 			}
 		} else if start < now {
-			t.Errorf("too many goroutines: +%d", now-start)
+			errorf("too many goroutines: +%d", now-start)
 		}
 	}
 }

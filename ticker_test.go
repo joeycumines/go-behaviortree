@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -66,16 +65,7 @@ func TestNewTicker_panic3(t *testing.T) {
 }
 
 func TestNewTicker_run(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 50)
-
-		endGoroutines := runtime.NumGoroutine()
-
-		if endGoroutines > startGoroutines {
-			t.Error("started with", startGoroutines, "goroutines and ended with", endGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 
 	var (
 		mutex   sync.Mutex
@@ -165,16 +155,7 @@ func TestNewTicker_run(t *testing.T) {
 }
 
 func TestNewTicker_runError(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 50)
-
-		endGoroutines := runtime.NumGoroutine()
-
-		if endGoroutines > startGoroutines {
-			t.Error("started with", startGoroutines, "goroutines and ended with", endGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 
 	expected := errors.New("some_error")
 
@@ -206,16 +187,7 @@ func TestNewTicker_runError(t *testing.T) {
 }
 
 func TestNewTicker_runCancel(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 100)
-
-		endGoroutines := runtime.NumGoroutine()
-
-		if endGoroutines > startGoroutines {
-			t.Error("started with", startGoroutines, "goroutines and ended with", endGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 
 	node := func() (Tick, []Node) {
 		return func(children []Node) (Status, error) {
@@ -224,15 +196,18 @@ func TestNewTicker_runCancel(t *testing.T) {
 		}, nil
 	}
 
-	startedAt := time.Now()
+	since := func() func() time.Duration {
+		startedAt := time.Now()
+		return func() time.Duration { return time.Since(startedAt) }
+	}()
+
 	defer func() {
-		diff := time.Since(startedAt)
-		if diff > time.Millisecond*100 {
-			t.Error("unexpected diff", diff)
+		if v := since(); v > time.Millisecond*700 {
+			t.Error(v)
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
 	c := NewTicker(
@@ -241,7 +216,19 @@ func TestNewTicker_runCancel(t *testing.T) {
 		node,
 	)
 
+	time.Sleep(time.Millisecond * 50)
+
+	select {
+	case <-c.Done():
+		t.Error()
+	default:
+	}
+
 	<-c.Done()
+
+	if v := since(); v < time.Millisecond*180 {
+		t.Error(v)
+	}
 
 	if err := c.Err(); err == nil || err.Error() != "context deadline exceeded" {
 		t.Error("unexpected error", err)
@@ -249,14 +236,7 @@ func TestNewTicker_runCancel(t *testing.T) {
 }
 
 func TestNewTickerStopOnFailure_success(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 100)
-		endGoroutines := runtime.NumGoroutine()
-		if startGoroutines < endGoroutines {
-			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 	var (
 		mutex  sync.Mutex
 		count  int
@@ -300,14 +280,7 @@ func TestNewTickerStopOnFailure_success(t *testing.T) {
 }
 
 func TestNewTickerStopOnFailure_error(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 100)
-		endGoroutines := runtime.NumGoroutine()
-		if startGoroutines < endGoroutines {
-			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 	ticker := NewTickerStopOnFailure(
 		context.Background(),
 		time.Millisecond*50,
@@ -325,14 +298,7 @@ func TestNewTickerStopOnFailure_error(t *testing.T) {
 }
 
 func TestNewTickerStopOnFailure_nilNode(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 100)
-		endGoroutines := runtime.NumGoroutine()
-		if startGoroutines < endGoroutines {
-			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 	defer func() {
 		if r := fmt.Sprint(recover()); r != "behaviortree.NewTickerStopOnFailure nil node" {
 			t.Error(r)
@@ -342,14 +308,7 @@ func TestNewTickerStopOnFailure_nilNode(t *testing.T) {
 }
 
 func TestNewTickerStopOnFailure_nilTick(t *testing.T) {
-	startGoroutines := runtime.NumGoroutine()
-	defer func() {
-		time.Sleep(time.Millisecond * 100)
-		endGoroutines := runtime.NumGoroutine()
-		if startGoroutines < endGoroutines {
-			t.Errorf("ended with %d more goroutines", endGoroutines-startGoroutines)
-		}
-	}()
+	defer checkNumGoroutines(t)(false, 0)
 	ticker := NewTickerStopOnFailure(
 		context.Background(),
 		time.Millisecond*10,

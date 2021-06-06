@@ -19,21 +19,12 @@ package behaviortree
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 )
 
 func TestFork_success(t *testing.T) {
-	defer func() func() {
-		startGoroutines := runtime.NumGoroutine()
-		return func() {
-			endGoroutines := runtime.NumGoroutine()
-			if endGoroutines > startGoroutines {
-				t.Error(startGoroutines, endGoroutines)
-			}
-		}
-	}()()
+	defer checkNumGoroutines(t)(false, 0)
 
 	var (
 		out    = make(chan string)
@@ -106,15 +97,7 @@ func TestFork_success(t *testing.T) {
 }
 
 func TestFork_failure(t *testing.T) {
-	defer func() func() {
-		startGoroutines := runtime.NumGoroutine()
-		return func() {
-			endGoroutines := runtime.NumGoroutine()
-			if endGoroutines > startGoroutines {
-				t.Error(startGoroutines, endGoroutines)
-			}
-		}
-	}()()
+	defer checkNumGoroutines(t)(false, 0)
 
 	var (
 		out    = make(chan string)
