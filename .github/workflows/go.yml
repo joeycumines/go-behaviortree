@@ -25,6 +25,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Set up Staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest
+        if: ${{ matrix.go-version != '1.13' }}
+      - name: Set up Staticcheck
+        run: GO111MODULE=on go get -u honnef.co/go/tools/cmd/staticcheck@2021.1
+        if: ${{ matrix.go-version == '1.13' }}
       - name: Checkout
         uses: actions/checkout@v2
       - name: Vet
