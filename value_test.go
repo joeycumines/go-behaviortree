@@ -82,7 +82,7 @@ func TestNode_Value_race(t *testing.T) {
 	if v := node.Value(k2{}); v != nil {
 		t.Error(v)
 	}
-	t.Log(time.Now().Sub(n))
+	t.Log(time.Since(n))
 }
 
 func nn(tick Tick, children ...Node) Node { return func() (Tick, []Node) { return tick, children } }
@@ -157,6 +157,7 @@ func TestNode_Value_noCaller(t *testing.T) {
 		t.Error(`expected done`)
 	}
 	valueDataMutex.Lock()
+	//lint:ignore SA2001 ensuring the lock can be acquired
 	valueDataMutex.Unlock()
 }
 

@@ -34,6 +34,7 @@ func TestNewTicker_panic1(t *testing.T) {
 			t.Fatal("unexpected panic", s)
 		}
 	}()
+	//lint:ignore SA1012 testing nil context
 	NewTicker(nil, 1, func() (Tick, []Node) {
 		return nil, nil
 	})
@@ -151,7 +152,7 @@ func TestNewTicker_run(t *testing.T) {
 
 		<-c.Done()
 
-		diff := time.Now().Sub(start)
+		diff := time.Since(start)
 
 		if diff > time.Millisecond*20 {
 			t.Fatal("unexpected diff", diff)
@@ -185,7 +186,7 @@ func TestNewTicker_runError(t *testing.T) {
 
 	startedAt := time.Now()
 	defer func() {
-		diff := time.Now().Sub(startedAt)
+		diff := time.Since(startedAt)
 		if diff > time.Millisecond*20 {
 			t.Error("unexpected diff", diff)
 		}
@@ -225,7 +226,7 @@ func TestNewTicker_runCancel(t *testing.T) {
 
 	startedAt := time.Now()
 	defer func() {
-		diff := time.Now().Sub(startedAt)
+		diff := time.Since(startedAt)
 		if diff > time.Millisecond*100 {
 			t.Error("unexpected diff", diff)
 		}
@@ -287,7 +288,7 @@ func TestNewTickerStopOnFailure_success(t *testing.T) {
 		t.Fatal("expected done")
 	case <-ticker.Done():
 	}
-	duration := time.Now().Sub(startedAt)
+	duration := time.Since(startedAt)
 	if duration < time.Millisecond*170 {
 		t.Error(duration.String())
 	}
@@ -337,7 +338,7 @@ func TestNewTickerStopOnFailure_nilNode(t *testing.T) {
 			t.Error(r)
 		}
 	}()
-	NewTickerStopOnFailure(nil, 0, nil)
+	NewTickerStopOnFailure(context.Background(), 0, nil)
 }
 
 func TestNewTickerStopOnFailure_nilTick(t *testing.T) {

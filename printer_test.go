@@ -241,7 +241,7 @@ func TestTreePrinter_Fprint_emptyMeta(t *testing.T) {
 	}
 	b := new(bytes.Buffer)
 	_ = p.Fprint(b, nn(nil))
-	if v := string(b.Bytes()); v != `[  ]  ` {
+	if v := b.String(); v != `[  ]  ` {
 		t.Error(v)
 	}
 }
