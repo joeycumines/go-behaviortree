@@ -27,7 +27,7 @@ func TestNode_Value_race(t *testing.T) {
 	defer func() func() {
 		start := runtime.NumGoroutine()
 		return func() {
-			time.Sleep(time.Millisecond * 100)
+			time.Sleep(time.Millisecond * 500)
 			finish := runtime.NumGoroutine()
 			if start < finish {
 				t.Error(start, finish)
