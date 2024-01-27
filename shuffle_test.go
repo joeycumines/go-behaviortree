@@ -25,7 +25,7 @@ import (
 )
 
 func ExampleShuffle() {
-	rand.Seed(1231244)
+	randSource := rand.NewSource(1231244)
 	var (
 		newPrintlnFn = func(fn func() []interface{}) Tick {
 			return func([]Node) (Status, error) {
@@ -45,7 +45,7 @@ func ExampleShuffle() {
 				}
 			}())),
 			New(
-				Shuffle(Sequence, nil),
+				Shuffle(Sequence, randSource),
 				New(newPrintln(`node 1`)),
 				New(newPrintln(`node 2`)),
 				New(
@@ -61,7 +61,7 @@ func ExampleShuffle() {
 						}
 					}()),
 					New(
-						Shuffle(Selector, nil),
+						Shuffle(Selector, randSource),
 						New(newPrintln(`node 3`)),
 						New(newPrintln(`node 4`)),
 						New(newPrintln(`node 5`)),

@@ -78,7 +78,7 @@ func TestNode_Value_race(t *testing.T) {
 
 func nn(tick Tick, children ...Node) Node { return func() (Tick, []Node) { return tick, children } }
 
-//noinspection GoNilness
+// noinspection GoNilness
 func TestNode_Value_simple(t *testing.T) {
 	type k1 struct{}
 	type k2 struct{}
