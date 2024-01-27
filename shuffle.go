@@ -16,7 +16,9 @@
 
 package behaviortree
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 // Shuffle implements randomised child execution order via encapsulation, using the provided source to shuffle the
 // children prior to passing through to the provided tick (a nil source will use global math/rand), note that this
