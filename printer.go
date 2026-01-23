@@ -19,8 +19,8 @@ package behaviortree
 import (
 	"bytes"
 	"fmt"
-	"github.com/xlab/treeprint"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -65,54 +65,71 @@ func (n Node) String() string {
 	return b.String()
 }
 
-// DefaultPrinterFormatter is used by DefaultPrinter
-func DefaultPrinterFormatter() TreePrinterNode { return new(treePrinterNodeXlab) }
-
 // DefaultPrinterInspector is used by DefaultPrinter
 func DefaultPrinterInspector(node Node, tick Tick) ([]interface{}, interface{}) {
 	var (
-		nodePtr      uintptr
-		nodeFileLine string
-		nodeName     string
-		tickPtr      uintptr
-		tickFileLine string
-		tickName     string
+		nodeName string
+		tickName string
 	)
-
+	var nodeStrings, tickStrings frameStrings
 	if v := node.Frame(); v != nil {
-		nodePtr = v.PC
-		nodeFileLine = shortFileLine(v.File, v.Line)
+		nodeStrings = getFrameStrings(v)
 		nodeName = v.Function
 	} else if node == nil {
+		nodeStrings.ptr = `0x0`
+		nodeStrings.file = `-`
 		nodeName = `<nil>`
 	}
-	if nodeFileLine == `` {
-		nodeFileLine = `-`
+	if nodeStrings.file == `` {
+		nodeStrings.file = `-`
 	}
 	if nodeName == `` {
 		nodeName = `-`
 	}
+	if name := node.Name(); name != "" {
+		nodeName = name
+	}
 
 	if v := tick.Frame(); v != nil {
-		tickPtr = v.PC
-		tickFileLine = shortFileLine(v.File, v.Line)
+		tickStrings = getFrameStrings(v)
 		tickName = v.Function
 	} else if tick == nil {
+		tickStrings.ptr = `0x0`
+		tickStrings.file = `-`
 		tickName = `<nil>`
 	}
-	if tickFileLine == `` {
-		tickFileLine = `-`
+	if tickStrings.file == `` {
+		tickStrings.file = `-`
 	}
 	if tickName == `` {
 		tickName = `-`
 	}
 
+	// Defaults for empty strings (e.g. if Mock prevented Frame lookup)
+	if nodeStrings.ptr == "" {
+		nodeStrings.ptr = "0x0"
+	}
+	if tickStrings.ptr == "" {
+		tickStrings.ptr = "0x0"
+	}
+
 	return []interface{}{
-		fmt.Sprintf(`%#x`, nodePtr),
-		nodeFileLine,
-		fmt.Sprintf(`%#x`, tickPtr),
-		tickFileLine,
-	}, fmt.Sprintf(`%s | %s`, nodeName, tickName)
+		nodeStrings.ptr,
+		nodeStrings.file,
+		tickStrings.ptr,
+		tickStrings.file,
+	}, nodeName + ` | ` + tickName
+}
+
+type frameStrings struct {
+	ptr  string
+	file string
+}
+
+func getFrameStrings(f *Frame) (s frameStrings) {
+	s.ptr = formatPtr(f.PC)
+	s.file = shortFileLine(f.File, f.Line)
+	return
 }
 
 // Fprint implements Printer.Fprint
@@ -135,85 +152,137 @@ func (p TreePrinter) build(tree TreePrinterNode, node Node) {
 	}
 }
 
+func formatPtr(p uintptr) string {
+	if p == 0 {
+		return `0x0`
+	}
+	return `0x` + strconv.FormatUint(uint64(p), 16)
+}
+
 func shortFileLine(f string, l int) string {
 	if i := strings.LastIndex(f, "/"); i >= 0 {
 		f = f[i+1:]
+	} else if i := strings.LastIndex(f, "\\"); i >= 0 {
+		f = f[i+1:]
 	}
-	return fmt.Sprintf(`%s:%d`, f, l)
+	return fmt.Sprintf("%s:%d", f, l)
 }
 
-type (
-	treePrinterNodeXlab struct {
-		node    treeprint.Tree
-		sizes   []int
-		updates []func()
-	}
-	treePrinterNodeXlabMeta struct {
-		*treePrinterNodeXlab
-		interfaces []interface{}
-		strings    []string
-	}
-)
+type treePrinterNode struct {
+	meta     []string
+	value    string
+	children []*treePrinterNode
+}
 
-func (n *treePrinterNodeXlab) Add(meta []interface{}, value interface{}) TreePrinterNode {
-	if n.node == nil {
-		r := new(treePrinterNodeXlab)
-		m := &treePrinterNodeXlabMeta{treePrinterNodeXlab: r, interfaces: meta}
-		m.updates = append(m.updates, m.update)
-		n.node = treeprint.New()
-		n.node.SetMetaValue(m)
-		n.node.SetValue(value)
+func (n *treePrinterNode) Add(meta []interface{}, value interface{}) TreePrinterNode {
+	strs := make([]string, len(meta))
+	for i, v := range meta {
+		if s, ok := v.(string); ok {
+			strs[i] = s
+		} else {
+			strs[i] = fmt.Sprint(v)
+		}
+	}
+	strVal := fmt.Sprint(value)
+
+	// first call initializes the root
+	if n.meta == nil && n.value == "" && n.children == nil {
+		n.meta = strs
+		n.value = strVal
 		return n
 	}
-	m := &treePrinterNodeXlabMeta{treePrinterNodeXlab: n, interfaces: meta}
-	m.updates = append(m.updates, m.update)
-	return &treePrinterNodeXlab{node: n.node.AddMetaBranch(m, value)}
+
+	child := &treePrinterNode{
+		meta:  strs,
+		value: strVal,
+	}
+	n.children = append(n.children, child)
+
+	return child
 }
-func (n *treePrinterNodeXlab) Bytes() []byte {
-	if n := n.node; n != nil {
-		b := n.Bytes()
-		if l := len(b); l != 0 && b[l-1] == '\n' {
-			b = b[:l-1]
-		}
-		return b
+
+func (n *treePrinterNode) Bytes() []byte {
+	if n.meta == nil && n.value == "" && n.children == nil {
+		return []byte(`<nil>`)
 	}
-	return []byte(`<nil>`)
+	var sizes []int
+	n.measure(&sizes)
+	var b bytes.Buffer
+	n.print(&b, "", sizes)
+	out := b.Bytes()
+	if len(out) > 0 && out[len(out)-1] == '\n' {
+		out = out[:len(out)-1]
+	}
+	return out
 }
-func (m *treePrinterNodeXlabMeta) String() string {
-	const space = ' '
-	for _, update := range m.updates {
-		update()
+
+func (n *treePrinterNode) measure(sizes *[]int) {
+	if len(n.meta) > len(*sizes) {
+		newSizes := make([]int, len(n.meta))
+		copy(newSizes, *sizes)
+		*sizes = newSizes
 	}
-	m.updates = nil
-	if m.interfaces != nil {
-		panic(fmt.Errorf(`m.interfaces %v should be nil`, m.interfaces))
-	}
-	if len(m.sizes) < len(m.strings) {
-		panic(fmt.Errorf(`m.sizes %v mismatched m.strings %v`, m.sizes, m.strings))
-	}
-	var b []byte
-	for i, size := range m.sizes {
-		if i != 0 {
-			b = append(b, space)
+	for i, s := range n.meta {
+		if l := len(s); l > (*sizes)[i] {
+			(*sizes)[i] = l
 		}
-		if i < len(m.strings) {
-			b = append(b, m.strings[i]...)
-			size -= len(m.strings[i])
-		}
-		b = append(b, bytes.Repeat([]byte{space}, size)...)
 	}
-	return string(b)
+	for _, child := range n.children {
+		child.measure(sizes)
+	}
 }
-func (m *treePrinterNodeXlabMeta) update() {
-	m.strings = make([]string, len(m.interfaces))
-	for i, v := range m.interfaces {
-		m.strings[i] = fmt.Sprint(v)
-		if i == len(m.sizes) {
-			m.sizes = append(m.sizes, 0)
+
+func (n *treePrinterNode) print(b *bytes.Buffer, prefix string, sizes []int) {
+	// print meta
+	// treeprint style: [meta1 meta2]  Value
+	b.WriteByte('[')
+	for i, s := range n.meta {
+		if i > 0 {
+			b.WriteByte(' ')
 		}
-		if v := len(m.strings[i]); v > m.sizes[i] {
-			m.sizes[i] = v
+		b.WriteString(s)
+		if i < len(sizes) {
+			pad := sizes[i] - len(s)
+			if pad > 0 {
+				b.Write(bytes.Repeat([]byte{' '}, pad))
+			}
 		}
 	}
-	m.interfaces = nil
+	b.WriteByte(']')
+
+	// print value
+	if n.value != "" {
+		b.WriteString("  ") // two spaces
+		lines := strings.Split(n.value, "\n")
+		b.WriteString(lines[0])
+		for i := 1; i < len(lines); i++ {
+			b.WriteByte('\n')
+			b.WriteString(prefix)
+			// Indent subsequent lines to align with the rest of the node's content block
+			// The visuals are: prefix + connector (4 chars: "├── " or "└── ")
+			// So we need 4 spaces to align under the connector.
+			b.WriteString("    ")
+			b.WriteString(lines[i])
+		}
+	}
+
+	b.WriteByte('\n')
+
+	// print children
+	for i, child := range n.children {
+		last := i == len(n.children)-1
+		b.WriteString(prefix)
+		var newPrefix string
+		if last {
+			b.WriteString("└── ")
+			newPrefix = prefix + "    "
+		} else {
+			b.WriteString("├── ")
+			newPrefix = prefix + "│   "
+		}
+		child.print(b, newPrefix, sizes)
+	}
 }
+
+// DefaultPrinterFormatter is used by DefaultPrinter
+func DefaultPrinterFormatter() TreePrinterNode { return new(treePrinterNode) }

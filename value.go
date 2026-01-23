@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -35,6 +36,7 @@ var (
 	valueDataKey    interface{}
 	valueDataChan   chan interface{}
 	valueDataCaller [1]uintptr
+	valueActive     uint32
 )
 
 // WithValue will return the receiver wrapped with a key-value pair, using similar semantics to the context package.
@@ -101,12 +103,17 @@ func (n Node) valuePrep(key interface{}) bool {
 	}
 	valueDataKey = key
 	valueDataChan = make(chan interface{}, 1)
+	atomic.StoreUint32(&valueActive, 1)
 	valueDataMutex.Unlock()
 	n()
+	atomic.StoreUint32(&valueActive, 0)
 	return true
 }
 
 func (n Node) valueHandle(fn func(key interface{}) (interface{}, bool)) {
+	if atomic.LoadUint32(&valueActive) == 0 {
+		return
+	}
 	valueDataMutex.RLock()
 	dataKey, dataChan, dataCaller := valueDataKey, valueDataChan, valueDataCaller
 	valueDataMutex.RUnlock()

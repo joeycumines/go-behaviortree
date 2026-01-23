@@ -17,6 +17,7 @@
 package behaviortree
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -59,27 +60,48 @@ func TestNode_Frame(t *testing.T) {
 				if frame != nil {
 					if frame.Line == 0 {
 						t.Error(frame.Line)
-					} else {
-						frame.Line = 0
 					}
 					if frame.PC == 0 {
 						t.Error(frame.PC)
-					} else {
-						frame.PC = 0
 					}
 					if frame.Entry == 0 {
 						t.Error(frame.Entry)
-					} else {
-						frame.Entry = 0
 					}
-					if i := strings.LastIndex(frame.File, "/"); i >= 0 {
-						frame.File = frame.File[i+1:]
-					} else {
-						t.Error(frame.File)
+					file := frame.File
+
+					// Verify Immutability: Modifying the returned frame instance must not
+					// affect the internal state of the Node or future calls.
+					frame.Line = 0
+					if f := test.Node.Frame(); f == nil || f.Line == 0 {
+						t.Error("safety regression: internal implementation detail exposed (mutable)")
+					}
+
+					file = filepath.Base(file)
+
+					if test.Frame != nil && file != test.Frame.File {
+						t.Errorf("file mismatch: %s != %s", file, test.Frame.File)
 					}
 				}
-				if (frame == nil) != (test.Frame == nil) || (frame != nil && *frame != *test.Frame) {
-					t.Errorf("%+v", frame)
+
+				if (frame == nil) != (test.Frame == nil) {
+					t.Errorf("frame nil presence mismatch: %v", frame)
+				} else if frame != nil {
+					// Manual comparison is required because the runtime Frame contains
+					// the full absolute path, while the test expectation uses the base filename.
+					f := frame.File
+					if i := strings.LastIndex(f, "/"); i >= 0 {
+						f = f[i+1:]
+					} else if i := strings.LastIndex(f, "\\"); i >= 0 {
+						f = f[i+1:]
+					}
+
+					if f != test.Frame.File {
+						t.Errorf("File: %s != %s", f, test.Frame.File)
+					}
+					if frame.Function != test.Frame.Function {
+						t.Errorf("Function: %s != %s", frame.Function, test.Frame.Function)
+					}
+					// PC, Line, and Entry are dynamic or checked for non-zero values above.
 				}
 			}
 		})
@@ -110,27 +132,35 @@ func TestTick_Frame(t *testing.T) {
 				if frame != nil {
 					if frame.Line == 0 {
 						t.Error(frame.Line)
-					} else {
-						frame.Line = 0
 					}
 					if frame.PC == 0 {
 						t.Error(frame.PC)
-					} else {
-						frame.PC = 0
 					}
 					if frame.Entry == 0 {
 						t.Error(frame.Entry)
-					} else {
-						frame.Entry = 0
 					}
-					if i := strings.LastIndex(frame.File, "/"); i >= 0 {
-						frame.File = frame.File[i+1:]
-					} else {
-						t.Error(frame.File)
+
+					// Verify Immutability: Ensure subsequent calls return a correct, fresh frame.
+					frame.Line = 0
+					if f := test.Tick.Frame(); f == nil || f.Line == 0 {
+						t.Error("tick frame integrity compromised")
 					}
 				}
-				if (frame == nil) != (test.Frame == nil) || (frame != nil && *frame != *test.Frame) {
-					t.Errorf("%+v", frame)
+				if (frame == nil) != (test.Frame == nil) {
+					t.Errorf("frame nil mismatch")
+				} else if frame != nil {
+					f := frame.File
+					if i := strings.LastIndex(f, "/"); i >= 0 {
+						f = f[i+1:]
+					} else if i := strings.LastIndex(f, "\\"); i >= 0 {
+						f = f[i+1:]
+					}
+					if f != test.Frame.File {
+						t.Errorf("File: %s != %s", f, test.Frame.File)
+					}
+					if frame.Function != test.Frame.Function {
+						t.Errorf("Function: %s != %s", frame.Function, test.Frame.Function)
+					}
 				}
 			}
 		})

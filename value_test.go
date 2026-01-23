@@ -19,12 +19,15 @@ package behaviortree
 import (
 	"fmt"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestNode_Value_race(t *testing.T) {
 	defer checkNumGoroutines(t)(false, waitNumGoroutinesDefault*3)
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	done := make(chan struct{})
 	defer close(done)
 	type k1 struct{}
@@ -33,7 +36,9 @@ func TestNode_Value_race(t *testing.T) {
 	for i := 0; i < 3000; i++ {
 		node := nodeOther
 		nodeOther = func() (Tick, []Node) { return node() }
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			ticker := time.NewTicker(time.Millisecond * 10)
 			defer ticker.Stop()
 			for {
@@ -46,7 +51,9 @@ func TestNode_Value_race(t *testing.T) {
 			}
 		}()
 	}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		ticker := time.NewTicker(time.Millisecond * 10)
 		defer ticker.Stop()
 		node := nn(Sequence).WithValue(k2{}, 3)

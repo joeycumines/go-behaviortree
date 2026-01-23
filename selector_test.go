@@ -17,8 +17,7 @@
 package behaviortree
 
 import (
-	"github.com/go-test/deep"
-	"strings"
+	"reflect"
 	"testing"
 )
 
@@ -63,8 +62,8 @@ func TestSelector_simple(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Success {
@@ -126,8 +125,8 @@ func TestSelector_error(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Failure {
@@ -180,8 +179,8 @@ func TestSelector_failure(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Success {
@@ -235,8 +234,8 @@ func TestSelector_running(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Running {

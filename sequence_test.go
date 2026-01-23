@@ -17,8 +17,7 @@
 package behaviortree
 
 import (
-	"github.com/go-test/deep"
-	"strings"
+	"reflect"
 	"testing"
 )
 
@@ -65,8 +64,8 @@ func TestSequence_simple(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Success {
@@ -136,8 +135,8 @@ func TestSequence_error(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Failure {
@@ -191,8 +190,8 @@ func TestSequence_failure(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Failure {
@@ -246,8 +245,8 @@ func TestSequence_running(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Running {
@@ -277,7 +276,7 @@ func TestSequence_invalidStatus(t *testing.T) {
 	if status, err := NewNode(Sequence, children).Tick(); err != nil || status != Failure {
 		t.Error(status, err)
 	}
-	if diff := deep.Equal(output, []int{0, 1, 2, 3}); diff != nil {
-		t.Errorf("%v\n%s", output, strings.Join(diff, "\n"))
+	if !reflect.DeepEqual(output, []int{0, 1, 2, 3}) {
+		t.Errorf("unexpected output\nexpected: %v\nactual:   %v", []int{0, 1, 2, 3}, output)
 	}
 }
