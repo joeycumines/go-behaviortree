@@ -16,6 +16,8 @@
 
 package behaviortree
 
+import "iter"
+
 // vkName is the context key for Node.Name
 type vkName struct{}
 
@@ -42,11 +44,12 @@ func (n Node) Name() string {
 // via closure) do not accurately represent the node's semantics (e.g. FSM acting as a leaf, or a decorator), or where
 // the node is a leaf but has internal structure relevant to inspection.
 //
-// Passing no children (or nil children) will cause Node.Structure to return a non-nil empty slice, which indicates
-// that the node has structure but it is empty (effectively masking any real children from the walker).
-func (n Node) WithStructure(children ...Node) Node {
+// Passing a nil sequence will cause Node.Structure to return nil, which indicates that any previously-attached structure
+// is cleared, and the walker should fall back to actual children. To mask children, pass an explicit empty sequence:
+// func(yield func(Node) bool) {}.
+func (n Node) WithStructure(children iter.Seq[Node]) Node {
 	if children == nil {
-		children = make([]Node, 0)
+		return n.WithValue(vkStructure{}, nil)
 	}
 	return n.WithValue(vkStructure{}, children)
 }
@@ -54,12 +57,12 @@ func (n Node) WithStructure(children ...Node) Node {
 // Structure returns the structure value of the node, or nil.
 //
 // A nil return indicates that no structure value was attached (and typically the walker should fall back to expansion).
-// A non-nil empty slice indicates that the structure is explicitly empty.
-func (n Node) Structure() []Node {
+// A non-nil empty sequence indicates that the structure is explicitly empty.
+func (n Node) Structure() iter.Seq[Node] {
 	if n == nil {
 		return nil
 	}
-	v, _ := n.Value(vkStructure{}).([]Node)
+	v, _ := n.Value(vkStructure{}).(iter.Seq[Node])
 	return v
 }
 
@@ -70,7 +73,7 @@ func Walk(n Node, fn func(n Node)) {
 	}
 	fn(n)
 	if s := n.Structure(); s != nil {
-		for _, child := range s {
+		for child := range s {
 			Walk(child, fn)
 		}
 	} else {

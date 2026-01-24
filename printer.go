@@ -60,7 +60,7 @@ var (
 func (n Node) String() string {
 	var b bytes.Buffer
 	if err := DefaultPrinter.Fprint(&b, n); err != nil {
-		return fmt.Sprintf(`behaviortree.DefaultPrinter error: %s`, err)
+		return fmt.Sprintf("behaviortree.DefaultPrinter error: %s", err)
 	}
 	return b.String()
 }
@@ -76,15 +76,15 @@ func DefaultPrinterInspector(node Node, tick Tick) ([]interface{}, interface{}) 
 		nodeStrings = getFrameStrings(v)
 		nodeName = v.Function
 	} else if node == nil {
-		nodeStrings.ptr = `0x0`
-		nodeStrings.file = `-`
-		nodeName = `<nil>`
+		nodeStrings.ptr = "0x0"
+		nodeStrings.file = "-"
+		nodeName = "<nil>"
 	}
-	if nodeStrings.file == `` {
-		nodeStrings.file = `-`
+	if nodeStrings.file == "" {
+		nodeStrings.file = "-"
 	}
-	if nodeName == `` {
-		nodeName = `-`
+	if nodeName == "" {
+		nodeName = "-"
 	}
 	if name := node.Name(); name != "" {
 		nodeName = name
@@ -94,15 +94,15 @@ func DefaultPrinterInspector(node Node, tick Tick) ([]interface{}, interface{}) 
 		tickStrings = getFrameStrings(v)
 		tickName = v.Function
 	} else if tick == nil {
-		tickStrings.ptr = `0x0`
-		tickStrings.file = `-`
-		tickName = `<nil>`
+		tickStrings.ptr = "0x0"
+		tickStrings.file = "-"
+		tickName = "<nil>"
 	}
-	if tickStrings.file == `` {
-		tickStrings.file = `-`
+	if tickStrings.file == "" {
+		tickStrings.file = "-"
 	}
-	if tickName == `` {
-		tickName = `-`
+	if tickName == "" {
+		tickName = "-"
 	}
 
 	// Defaults for empty strings (e.g. if Mock prevented Frame lookup)
@@ -118,7 +118,7 @@ func DefaultPrinterInspector(node Node, tick Tick) ([]interface{}, interface{}) 
 		nodeStrings.file,
 		tickStrings.ptr,
 		tickStrings.file,
-	}, nodeName + ` | ` + tickName
+	}, nodeName + " | " + tickName
 }
 
 type frameStrings struct {
@@ -154,9 +154,9 @@ func (p TreePrinter) build(tree TreePrinterNode, node Node) {
 
 func formatPtr(p uintptr) string {
 	if p == 0 {
-		return `0x0`
+		return "0x0"
 	}
-	return `0x` + strconv.FormatUint(uint64(p), 16)
+	return "0x" + strconv.FormatUint(uint64(p), 16)
 }
 
 func shortFileLine(f string, l int) string {
@@ -203,7 +203,7 @@ func (n *treePrinterNode) Add(meta []interface{}, value interface{}) TreePrinter
 
 func (n *treePrinterNode) Bytes() []byte {
 	if n.meta == nil && n.value == "" && n.children == nil {
-		return []byte(`<nil>`)
+		return []byte("<nil>")
 	}
 	var sizes []int
 	n.measure(&sizes)

@@ -3,6 +3,7 @@ package behaviortree
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -29,9 +30,9 @@ func TestNode_Metadata(t *testing.T) {
 		}
 
 		child := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
-		n2 := n.WithStructure(child)
+		n2 := n.WithStructure(slices.Values([]Node{child}))
 
-		s := n2.Structure()
+		s := slices.Collect(n2.Structure())
 		if len(s) != 1 || fmt.Sprintf("%p", s[0]) != fmt.Sprintf("%p", child) {
 			t.Errorf("structure mismatch")
 		}
@@ -41,13 +42,44 @@ func TestNode_Metadata(t *testing.T) {
 		}
 	})
 
-	t.Run("WithStructure Masking", func(t *testing.T) {
+	t.Run("WithStructure Clear", func(t *testing.T) {
 		n := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
-		n2 := n.WithStructure() // Empty
-		s := n2.Structure()
-		if s == nil {
-			t.Error("expected non-nil empty slice")
+		// Attach structure first
+		n2 := n.WithStructure(slices.Values([]Node{n}))
+		if n2.Structure() == nil {
+			t.Error("expected non-nil structure")
 		}
+		// Clear it
+		n3 := n2.WithStructure(nil)
+		if n3.Structure() != nil {
+			t.Error("expected nil structure")
+		}
+	})
+
+	t.Run("WithStructure Interface Nil", func(t *testing.T) {
+		n := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
+		n2 := n.WithStructure(nil)
+
+		// Verify via Value() that it is raw interface nil, not typed nil
+		val := n2.Value(vkStructure{})
+		if val != nil {
+			t.Errorf("expected nil interface, got %T: %v", val, val)
+		}
+
+		// Also verify Structure() works as expected
+		if n2.Structure() != nil {
+			t.Error("expected Structure() to return nil")
+		}
+	})
+
+	t.Run("WithStructure Explicit Empty", func(t *testing.T) {
+		n := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
+		n2 := n.WithStructure(func(yield func(Node) bool) {})
+		seq := n2.Structure()
+		if seq == nil {
+			t.Error("expected non-nil sequence")
+		}
+		s := slices.Collect(seq)
 		if len(s) != 0 {
 			t.Error("expected empty slice")
 		}
@@ -65,7 +97,7 @@ func TestWalk(t *testing.T) {
 	childB := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil).WithName("ChildB")
 
 	root := NewNode(func(children []Node) (Status, error) { return Success, nil }, []Node{childA}).WithName("Root")
-	rootWithStructure := root.WithStructure(childB)
+	rootWithStructure := root.WithStructure(slices.Values([]Node{childB}))
 
 	Walk(rootWithStructure, func(n Node) {
 		visited = append(visited, n.Name())
@@ -77,9 +109,21 @@ func TestWalk(t *testing.T) {
 		t.Errorf("expected %v, got %v", expected, visited)
 	}
 
-	// Test Masking
+	// Test Clearing (Exposing underlying children)
 	visited = nil
-	rootMasked := root.WithStructure()
+	// rootWithStructure has ChildB. passing nil should revert to root's behavior (ChildA)
+	rootRestored := rootWithStructure.WithStructure(nil)
+	Walk(rootRestored, func(n Node) {
+		visited = append(visited, n.Name())
+	})
+	expected = []string{"Root", "ChildA"}
+	if !reflect.DeepEqual(visited, expected) {
+		t.Errorf("expected %v, got. %v", expected, visited)
+	}
+
+	// Test Explicit Masking
+	visited = nil
+	rootMasked := root.WithStructure(func(yield func(Node) bool) {})
 	Walk(rootMasked, func(n Node) {
 		visited = append(visited, n.Name())
 	})

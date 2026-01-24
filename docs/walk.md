@@ -27,9 +27,9 @@ A critical feature of `Walk` is its ability to distinguish between "physical" st
 For any given node `n`, `Walk` determines children in the following order:
 
 1. **Logical Structure (Metadata)**:
-   It first checks `n.Structure()`. If this returns a non-nil slice, `Walk` iterates over these nodes.
+   It first checks `n.Structure()`. If this returns a non-nil sequence, `Walk` iterates over these nodes.
     * This allows decorators, wrappers, or complex leaf nodes (like FSMs) to present a simplified or virtual hierarchy to tools.
-    * An empty slice returned by `Structure()` effectively "masks" the node's children, making it appear as a leaf to the walker.
+    * An empty sequence returned by `Structure()` effectively "masks" the node's children, making it appear as a leaf to the walker.
 
 2. **Physical Structure (Expansion)**:
    If `Structure()` returns `nil` (default), `Walk` falls back to expanding the node using its definition.
