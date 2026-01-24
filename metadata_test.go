@@ -30,7 +30,7 @@ func TestNode_Metadata(t *testing.T) {
 		}
 
 		child := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
-		n2 := n.WithStructure(slices.Values([]Node{child}))
+		n2 := n.WithStructure(slices.Values([]Metadata{child}))
 
 		s := slices.Collect(n2.Structure())
 		if len(s) != 1 || fmt.Sprintf("%p", s[0]) != fmt.Sprintf("%p", child) {
@@ -45,7 +45,7 @@ func TestNode_Metadata(t *testing.T) {
 	t.Run("WithStructure Clear", func(t *testing.T) {
 		n := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
 		// Attach structure first
-		n2 := n.WithStructure(slices.Values([]Node{n}))
+		n2 := n.WithStructure(slices.Values([]Metadata{n}))
 		if n2.Structure() == nil {
 			t.Error("expected non-nil structure")
 		}
@@ -74,7 +74,7 @@ func TestNode_Metadata(t *testing.T) {
 
 	t.Run("WithStructure Explicit Empty", func(t *testing.T) {
 		n := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil)
-		n2 := n.WithStructure(func(yield func(Node) bool) {})
+		n2 := n.WithStructure(func(yield func(Metadata) bool) {})
 		seq := n2.Structure()
 		if seq == nil {
 			t.Error("expected non-nil sequence")
@@ -97,10 +97,13 @@ func TestWalk(t *testing.T) {
 	childB := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil).WithName("ChildB")
 
 	root := NewNode(func(children []Node) (Status, error) { return Success, nil }, []Node{childA}).WithName("Root")
-	rootWithStructure := root.WithStructure(slices.Values([]Node{childB}))
+	rootWithStructure := root.WithStructure(slices.Values([]Metadata{childB}))
 
-	Walk(rootWithStructure, func(n Node) {
-		visited = append(visited, n.Name())
+	Walk(rootWithStructure, func(n Metadata) bool {
+		if node, ok := n.(Node); ok {
+			visited = append(visited, node.Name())
+		}
+		return true
 	})
 
 	// Expect: Root, ChildB. (ChildA should be skipped because Structure overrides)
@@ -121,8 +124,11 @@ func TestWalk(t *testing.T) {
 	// Physical children reflect the actual execution path through the chain, which yields childA.
 	// This is correct behavior: WithStructure(nil) clears the metadata, exposing the physical structure.
 	rootRestored := rootWithStructure.WithStructure(nil)
-	Walk(rootRestored, func(n Node) {
-		visited = append(visited, n.Name())
+	Walk(rootRestored, func(n Metadata) bool {
+		if node, ok := n.(Node); ok {
+			visited = append(visited, node.Name())
+		}
+		return true
 	})
 	expected = []string{"Root", "ChildA"}
 	if !reflect.DeepEqual(visited, expected) {
@@ -131,9 +137,12 @@ func TestWalk(t *testing.T) {
 
 	// Test Explicit Masking
 	visited = nil
-	rootMasked := root.WithStructure(func(yield func(Node) bool) {})
-	Walk(rootMasked, func(n Node) {
-		visited = append(visited, n.Name())
+	rootMasked := root.WithStructure(func(yield func(Metadata) bool) {})
+	Walk(rootMasked, func(n Metadata) bool {
+		if node, ok := n.(Node); ok {
+			visited = append(visited, node.Name())
+		}
+		return true
 	})
 	expected = []string{"Root"}
 	if !reflect.DeepEqual(visited, expected) {
@@ -142,8 +151,11 @@ func TestWalk(t *testing.T) {
 
 	// Test Default expansion in Walk
 	visited = nil
-	Walk(root, func(n Node) {
-		visited = append(visited, n.Name())
+	Walk(root, func(n Metadata) bool {
+		if node, ok := n.(Node); ok {
+			visited = append(visited, node.Name())
+		}
+		return true
 	})
 	expected = []string{"Root", "ChildA"}
 	if !reflect.DeepEqual(visited, expected) {

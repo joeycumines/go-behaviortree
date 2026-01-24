@@ -9,33 +9,48 @@ Unlike a running tree which executes `Tick` logic, `Walk` is designed to inspect
 ### Signature
 
 ```go
-func Walk(n Node, fn func (n Node))
+package behaviortree
+
+func Walk(n Metadata, fn func(n Metadata) bool)
 ```
 
-- **n**: The root node to start traversal from.
-- **fn**: A callback function executed for every visited node (including the root).
+- **n**: The root object to start traversal from. This is typically a `Node` (which implements `Metadata`), but can be any implementation of the `Metadata` interface.
+- **fn**: A callback function executed for every visited node. Returning `false` stops traversal.
 
 ## Mechanics
 
 Breadth-first or depth-first? **Depth-first**.
-The walker visits the current node `n`, then recursively visits each valid child.
+The walker visits the current node `n`, then recursively visits each valid child yielded by `n.Children()`.
 
 ### Structural Resolution
 
-A critical feature of `Walk` is its ability to distinguish between "physical" structure (the actual functions and closures implementing the tree) and "logical" structure (what the user conceptually considers the tree).
+The `Walk` function is designed to traverse the "conceptual" tree structure, which may differ from the "physical" structure (the actual compiled closures and function pointers).
 
-For any given node `n`, `Walk` determines children in the following order:
+This decoupling is achieved via the `Metadata` interface:
 
-1. **Logical Structure (Metadata)**:
-   It first checks `n.Structure()`. If this returns a non-nil sequence, `Walk` iterates over these nodes.
-    * This allows decorators, wrappers, or complex leaf nodes (like FSMs) to present a simplified or virtual hierarchy to tools.
-    * An empty sequence returned by `Structure()` effectively "masks" the node's children, making it appear as a leaf to the walker.
+```go
+package behaviortree
+
+type Metadata interface {
+	Value(key any) any
+	Children(yield func(Metadata) bool)
+}
+
+```
+
+When `Walk` visits a node `n`, it effectively iterates over `n.Children()`. The `Node` implementation of this method resolves the children in the following order:
+
+1. **Conceptual Structure (Metadata)**:
+   It first checks `n.Structure()` (accessed via `Value`).
+    * If this returns a non-nil sequence of `Metadata` items, `Walk` iterates over these items *instead* of physically expanding the node.
+    * This allows for "virtualized" subtrees. For example, a complex `Selector` could present itself to the walker as a simple leaf, or a leaf could generate a sequence of virtual nodes representing its internal state.
+    * **Efficiency Note**: By yielding objects that strictly implement `Metadata` (and aren't necessarily full `Node` instances), one can avoid the overhead of the `Node` machinery (specifically the `Value` locking mechanism) for large, read-only subtrees.
 
 2. **Physical Structure (Expansion)**:
-   If `Structure()` returns `nil` (default), `Walk` falls back to expanding the node using its definition.
+   If `Structure()` returns `nil` (the default), the node falls back to expanding itself.
     * It executes `tick, children := n()`.
-    * This executes the node's factory function to retrieve its children.
-    * CRITICAL: This assumes the node definition `n()` is a side-effect-free factory, which is the standard pattern for `behaviortree`.
+    * This uses the standard `behaviortree` factory pattern to retrieve the actual child nodes.
+    * This ensures that by default, `Walk` accurately reflects the execution hierarchy.
 
 ## Performance Considerations
 
@@ -67,9 +82,9 @@ The following benchmarks verify the performance characteristics of `Walk` on an 
 
 `Walk` is **not** safe to call concurrently on a tree that is being mutated, although `behaviortree` nodes are typically immutable after construction.
 
-The `Node.Value` mechanism used by `Structure()` relies on a global lock (`valueCallMutex`) to ensure safety during the introspection step. This prevents data races but means concurrent `Walk` calls (or `Walk` concurrent with other introspection) will be serialized globally.
-
-> **Note on Deadlocks**: The global lock is not re-entrant. While standard `Walk` usage is strictly sequential and safe, custom `Node` implementations that perform recursive introspection (calling `Value` inside their own definition) will deadlock. This is an intentional constraint to enforce simple, side-effect-free structural definitions.
+> **Note on Deadlocks**: The global lock used by `Node.Value` is not re-entrant. While standard `Walk` usage is safe, custom `Node` implementations that recursively call `Value` during their own definition phase (inside `n()`) will deadlock.
+>
+> **Performance Tip**: To avoid the contention of the global `Value` lock entirely for a subtree, implement a custom `Metadata` type that is *not* a `Node` and return it via `Structure()`. This allows `Walk` to traverse that subtree without touching the `behaviortree` lock mechanism.
 
 ## Best Practices
 
