@@ -12,27 +12,33 @@ jobs:
     permissions:
       actions: read
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version:
-          - '1.21'
-          - '1.20'
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: stable
           check-latest: true
       - name: Set up Staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Vet
         run: go vet -v ./...
       - name: Staticcheck
         run: staticcheck ./...
       - name: Build
         run: go build -v ./...
+      - name: Cross-platform build
+        shell: bash
+        run: |-
+          set -xe || exit 1
+          export GOOS='' GOARCH='' CGO_ENABLED=0
+          for platform in linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64; do
+            GOOS=${platform%/*}
+            GOARCH=${platform#*/}
+            go build ./...
+          done
       - name: Test
-        run: go test -v -cover -race -count=3 ./...
+        run: go test -v -cover -count=1 ./...
+      - name: Race
+        run: go test -v -race -count=3 ./...
