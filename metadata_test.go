@@ -111,14 +111,22 @@ func TestWalk(t *testing.T) {
 
 	// Test Clearing (Exposing underlying children)
 	visited = nil
-	// rootWithStructure has ChildB. passing nil should revert to root's behavior (ChildA)
+	// rootWithStructure has ChildB. passing nil reverts to root's behavior (ChildA)
+	//
+	// NOTE: This creates outer: rootRestored -> inner: rootWithStructure -> root
+	// When rootRestored.WithStructure(nil) is called, it creates a wrapper that returns nil
+	// for Structure(). However, physical children come from the underlying chain:
+	// rootRestored() -> rootWithStructure() -> root() which still returns [childA].
+	// The Walker checks Structure() first, gets nil, then calls n() to get physical children.
+	// Physical children reflect the actual execution path through the chain, which yields childA.
+	// This is correct behavior: WithStructure(nil) clears the metadata, exposing the physical structure.
 	rootRestored := rootWithStructure.WithStructure(nil)
 	Walk(rootRestored, func(n Node) {
 		visited = append(visited, n.Name())
 	})
 	expected = []string{"Root", "ChildA"}
 	if !reflect.DeepEqual(visited, expected) {
-		t.Errorf("expected %v, got. %v", expected, visited)
+		t.Errorf("expected %v, got %v", expected, visited)
 	}
 
 	// Test Explicit Masking
