@@ -71,17 +71,20 @@ var _ ValueAttachable[Node] = Node(nil)
 // vkName is the context key for Node.Name
 type vkName struct{}
 
+// GetName retrieves the name value from the Valuer, or returns an empty string if not present.
+//
+// This helper facilitates interoperability with external implementations of the [Valuer] interface.
 func GetName(n Valuer) string {
 	v, _ := n.Value(vkName{}).(string)
 	return v
 }
 
+// WithName returns the value attachable with the name value attached.
+//
+// This helper facilitates interoperability with external implementations of the [ValueAttachable] interface.
 func WithName[T any](n ValueAttachable[T], name string) T {
 	return n.WithValue(vkName{}, name)
 }
-
-// vkStructure is the context key for Node.Structure
-type vkStructure struct{}
 
 // WithName returns a copy of the receiver, wrapped with the name value attached, for access via Node.Name.
 func (n Node) WithName(name string) Node {
@@ -91,6 +94,32 @@ func (n Node) WithName(name string) Node {
 // Name returns the name value of the node, or an empty string.
 func (n Node) Name() string {
 	return GetName(n)
+}
+
+// vkStructure is the context key for Node.Structure
+type vkStructure struct{}
+
+// GetStructure retrieves the logical structure sequence from the Valuer, or nil if not present.
+//
+// This helper facilitates interoperability with external implementations of the [Valuer] interface.
+//
+// See [Node.Structure] for more details on the semantic meaning of the return value.
+func GetStructure(n Valuer) iter.Seq[Metadata] {
+	v, _ := n.Value(vkStructure{}).(iter.Seq[Metadata])
+	return v
+}
+
+// WithStructure returns the value attachable with the structure value attached.
+//
+// This helper facilitates interoperability with external implementations of the [ValueAttachable] interface.
+//
+// Passing a nil sequence will attach a nil value, effectively clearing any previous structure.
+// To explicitly mask children (making it appear as a leaf), pass an empty sequence.
+func WithStructure[T any](n ValueAttachable[T], children iter.Seq[Metadata]) T {
+	if children == nil {
+		return n.WithValue(vkStructure{}, nil)
+	}
+	return n.WithValue(vkStructure{}, children)
 }
 
 // WithStructure returns a copy of the receiver, wrapped with the structure value attached, for access via Node.Structure.
@@ -105,10 +134,7 @@ func (n Node) Name() string {
 // physical node expansion. To explicitly mask children (making the node appear as a leaf), pass an empty sequence:
 // func(yield func(Metadata) bool) {}.
 func (n Node) WithStructure(children iter.Seq[Metadata]) Node {
-	if children == nil {
-		return n.WithValue(vkStructure{}, nil)
-	}
-	return n.WithValue(vkStructure{}, children)
+	return WithStructure[Node](n, children)
 }
 
 // Structure returns the structure value of the node, or nil.
@@ -116,8 +142,7 @@ func (n Node) WithStructure(children iter.Seq[Metadata]) Node {
 // A nil return indicates that no structure value was attached (and typically the walker should fall back to expansion).
 // A non-nil empty sequence indicates that the structure is explicitly empty.
 func (n Node) Structure() iter.Seq[Metadata] {
-	v, _ := n.Value(vkStructure{}).(iter.Seq[Metadata])
-	return v
+	return GetStructure(n)
 }
 
 // Walk traverses the "conceptual" tree structure starting from n, depth-first.

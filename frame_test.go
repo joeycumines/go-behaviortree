@@ -41,7 +41,7 @@ func TestNode_Frame(t *testing.T) {
 		},
 		{
 			Name: `nn with value explicit frame`,
-			Node: nn(nil, nil).WithValue(vkFrame{}, &Frame{
+			Node: nn(nil, nil).WithFrame(&Frame{
 				PC:       0x568dc0,
 				Function: "github.com/joeycumines/go-behaviortree.glob..func1.1",
 				File:     "C:/Users/under/go/src/github.com/joeycumines/go-behaviortree/behaviortree.go",
