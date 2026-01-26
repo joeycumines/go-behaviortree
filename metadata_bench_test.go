@@ -144,7 +144,7 @@ func (s *simpleMetadata) Children(yield func(Metadata) bool) {
 	}
 }
 
-func BenchmarkWalk_StructureDeep100_Optimized(b *testing.B) {
+func BenchmarkWalk_HybridOptimized(b *testing.B) {
 	// Build a deep tree using custom metadata structs instead of Nodes
 	var current Metadata = noOpNode
 	for i := 0; i < 100; i++ {
