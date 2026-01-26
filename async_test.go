@@ -1,5 +1,5 @@
 /*
-   Copyright 2021 Joseph Cumines
+   Copyright 2026 Joseph Cumines
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package behaviortree
 
 import (
 	"errors"
-	"github.com/go-test/deep"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -35,8 +35,8 @@ func TestAsync_behaviour(t *testing.T) {
 				running = false
 			}
 		}
-		if diff := deep.Equal(expected, actual); diff != nil {
-			t.Fatal("unexpected out diff:", diff)
+		if !reflect.DeepEqual(expected, actual) {
+			t.Fatal("unexpected out diff\nexpected: ", expected, "\nactual:   ", actual)
 		}
 	}
 

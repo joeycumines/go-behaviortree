@@ -1,5 +1,5 @@
 /*
-   Copyright 2021 Joseph Cumines
+   Copyright 2026 Joseph Cumines
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -51,12 +51,36 @@ type (
 	vkFrame struct{}
 )
 
+// GetFrame retrieves the attached frame from the Valuer, or nil if not present.
+//
+// This helper facilitates interoperability with external implementations of the [Valuer] interface.
+func GetFrame(n Valuer) *Frame {
+	v, _ := n.Value(vkFrame{}).(*Frame)
+	return v
+}
+
+// WithFrame returns the value attachable with the frame attached.
+//
+// This helper facilitates interoperability with external implementations of the [ValueAttachable] interface.
+func WithFrame[T any](n ValueAttachable[T], frame *Frame) T {
+	if frame == nil {
+		return n.WithValue(vkFrame{}, nil)
+	}
+	v := *frame
+	return n.WithValue(vkFrame{}, &v)
+}
+
+// WithFrame returns a copy of the receiver, wrapped with the frame attached.
+func (n Node) WithFrame(frame *Frame) Node {
+	return WithFrame[Node](n, frame)
+}
+
 // Frame will return the call frame for the caller of New/NewNode, an approximation based on the receiver, or nil.
 //
 // This method uses the Value mechanism and is subject to the same warnings / performance limitations.
 func (n Node) Frame() *Frame {
-	if v, _ := n.Value(vkFrame{}).(*Frame); v != nil {
-		v := *v
+	if f := GetFrame(n); f != nil {
+		v := *f
 		return &v
 	}
 	return newFrame(n)

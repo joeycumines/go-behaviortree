@@ -1,5 +1,5 @@
 /*
-   Copyright 2021 Joseph Cumines
+   Copyright 2026 Joseph Cumines
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,8 +18,7 @@ package behaviortree
 
 import (
 	"fmt"
-	"github.com/go-test/deep"
-	"strings"
+	"reflect"
 	"testing"
 )
 
@@ -111,8 +110,8 @@ func TestNewNode(t *testing.T) {
 		<-out,
 	}
 
-	if diff := deep.Equal(expected, actual); diff != nil {
-		t.Fatalf("expected tick order != actual: %s", strings.Join(diff, "\n  >"))
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected tick order != actual\nexpected: %v\nactual:   %v", expected, actual)
 	}
 
 	if status != Success {

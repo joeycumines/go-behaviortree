@@ -1,5 +1,5 @@
 /*
-   Copyright 2021 Joseph Cumines
+   Copyright 2026 Joseph Cumines
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,12 +19,16 @@ package behaviortree
 import (
 	"fmt"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestNode_Value_race(t *testing.T) {
 	defer checkNumGoroutines(t)(false, waitNumGoroutinesDefault*3)
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	done := make(chan struct{})
 	defer close(done)
 	type k1 struct{}
@@ -33,7 +37,9 @@ func TestNode_Value_race(t *testing.T) {
 	for i := 0; i < 3000; i++ {
 		node := nodeOther
 		nodeOther = func() (Tick, []Node) { return node() }
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			ticker := time.NewTicker(time.Millisecond * 10)
 			defer ticker.Stop()
 			for {
@@ -46,7 +52,9 @@ func TestNode_Value_race(t *testing.T) {
 			}
 		}()
 	}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		ticker := time.NewTicker(time.Millisecond * 10)
 		defer ticker.Stop()
 		node := nn(Sequence).WithValue(k2{}, 3)
@@ -284,4 +292,34 @@ func Benchmark_newExampleCounter_withValueBackgroundStringer(b *testing.B) {
 		}
 	}
 	Result = status
+}
+
+func TestValue_panicSafety(t *testing.T) {
+	// Ensure clean state
+	if val := atomic.LoadUint32(&valueActive); val != 0 {
+		t.Fatalf("valueActive should be 0 initially, got %d", val)
+	}
+
+	panickingNode := func() (Tick, []Node) {
+		panic("boom")
+	}
+
+	// Helper to recover panic
+	func() {
+		defer func() {
+			if r := recover(); r != "boom" {
+				t.Errorf("caught unexpected panic: %v", r)
+			}
+		}()
+		// Trigger the panic path
+		// calling n.Value(key) calls valueSync -> valuePrep.
+		Node(panickingNode).Value("key")
+	}()
+
+	// Verify flag is reset
+	if val := atomic.LoadUint32(&valueActive); val != 0 {
+		t.Errorf("valueActive stuck at %d after panic", val)
+		// Clean up for other tests
+		atomic.StoreUint32(&valueActive, 0)
+	}
 }
