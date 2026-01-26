@@ -36,24 +36,61 @@ type Metadata interface {
 	Children(yield func(Metadata) bool)
 }
 
+var _ Metadata = Node(nil)
+
+// Valuer is an interface for types that can return values associated with keys.
+//
+// This interface along with [ValueAttachable] allows for generic handling of key-value attachments
+// without tying to a specific implementation. It is intended for implementation of [context.Context]-style
+// `With*` and `Get*` exported functions, used to keep the keys private while allowing external packages to
+// attach and retrieve values.
+//
+// Note: [Node] implements this interface.
+type Valuer interface {
+	// Value returns the value associated with the given key, or nil if not present.
+	// This loosely corresponds to [context.Context]'s `Value` method.
+	Value(key any) any
+}
+
+var _ Valuer = Node(nil)
+
+// ValueAttachable is an interface for types that support attaching key-value pairs.
+//
+// This interface along with [Valuer] allows for generic handling of key-value attachments
+// without tying to a specific implementation. It is intended for implementation of [context.Context]-style
+// `With*` and `Get*` exported functions, used to keep the keys private while allowing external packages to
+// attach and retrieve values.
+//
+// Note: [Node] implements this interface.
+type ValueAttachable[T any] interface {
+	WithValue(key, value any) T
+}
+
+var _ ValueAttachable[Node] = Node(nil)
+
 // vkName is the context key for Node.Name
 type vkName struct{}
+
+func GetName(n Valuer) string {
+	v, _ := n.Value(vkName{}).(string)
+	return v
+}
+
+func WithName[T any](n ValueAttachable[T], name string) T {
+	return n.WithValue(vkName{}, name)
+}
 
 // vkStructure is the context key for Node.Structure
 type vkStructure struct{}
 
 // WithName returns a copy of the receiver, wrapped with the name value attached, for access via Node.Name.
 func (n Node) WithName(name string) Node {
-	return n.WithValue(vkName{}, name)
+	return WithName[Node](n, name)
 }
 
 // Name returns the name value of the node, or an empty string.
 func (n Node) Name() string {
-	if n == nil {
-		return ""
-	}
-	v, _ := n.Value(vkName{}).(string)
-	return v
+	return GetName(n)
 }
 
 // WithStructure returns a copy of the receiver, wrapped with the structure value attached, for access via Node.Structure.
@@ -79,9 +116,6 @@ func (n Node) WithStructure(children iter.Seq[Metadata]) Node {
 // A nil return indicates that no structure value was attached (and typically the walker should fall back to expansion).
 // A non-nil empty sequence indicates that the structure is explicitly empty.
 func (n Node) Structure() iter.Seq[Metadata] {
-	if n == nil {
-		return nil
-	}
 	v, _ := n.Value(vkStructure{}).(iter.Seq[Metadata])
 	return v
 }
