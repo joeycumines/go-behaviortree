@@ -169,9 +169,10 @@ func shortFileLine(f string, l int) string {
 }
 
 type treePrinterNode struct {
-	meta     []string
-	value    string
-	children []*treePrinterNode
+	meta        []string
+	value       string
+	children    []*treePrinterNode
+	initialized bool
 }
 
 func (n *treePrinterNode) Add(meta []interface{}, value interface{}) TreePrinterNode {
@@ -186,15 +187,17 @@ func (n *treePrinterNode) Add(meta []interface{}, value interface{}) TreePrinter
 	strVal := fmt.Sprint(value)
 
 	// first call initializes the root
-	if n.meta == nil && n.value == "" && n.children == nil {
+	if !n.initialized {
+		n.initialized = true
 		n.meta = strs
 		n.value = strVal
 		return n
 	}
 
 	child := &treePrinterNode{
-		meta:  strs,
-		value: strVal,
+		meta:        strs,
+		value:       strVal,
+		initialized: true,
 	}
 	n.children = append(n.children, child)
 
@@ -202,7 +205,7 @@ func (n *treePrinterNode) Add(meta []interface{}, value interface{}) TreePrinter
 }
 
 func (n *treePrinterNode) Bytes() []byte {
-	if n.meta == nil && n.value == "" && n.children == nil {
+	if !n.initialized {
 		return []byte("<nil>")
 	}
 	var sizes []int

@@ -317,3 +317,34 @@ func TestTreePrinter_Alignment(t *testing.T) {
 		t.Errorf("alignment failed, child header not padded correctly:\n%s", got)
 	}
 }
+
+func TestTreePrinter_rootOverwrite(t *testing.T) {
+	root := DefaultPrinterFormatter()
+
+	// 1. Initialize root with "empty" data (nil meta -> empty slice, empty value)
+	// If the implementation is fragile, this might result in "uninitialized" state detection somehow?
+	root.Add(nil, "")
+
+	// 2. Add a child
+	// Should be added as a child, NOT overwrite root
+	root.Add([]interface{}{"childMeta"}, "childValue")
+
+	output := string(root.Bytes())
+
+	// Check for "[]" at start (root meta)
+	if len(output) < 2 || output[:2] != "[]" {
+		t.Errorf("FAIL: Root node does not appear to be empty root. Output start: %q\nFull output: %q", output[:min(len(output), 10)], output)
+	}
+
+	// Check that child exists
+	if !strings.Contains(output, "[childMeta]") {
+		t.Errorf("FAIL: Child node not found in output: %q", output)
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

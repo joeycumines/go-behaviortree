@@ -105,8 +105,8 @@ func (n Node) valuePrep(key interface{}) bool {
 	valueDataChan = make(chan interface{}, 1)
 	atomic.StoreUint32(&valueActive, 1)
 	valueDataMutex.Unlock()
+	defer atomic.StoreUint32(&valueActive, 0)
 	n()
-	atomic.StoreUint32(&valueActive, 0)
 	return true
 }
 

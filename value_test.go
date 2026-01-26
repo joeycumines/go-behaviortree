@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -291,4 +292,34 @@ func Benchmark_newExampleCounter_withValueBackgroundStringer(b *testing.B) {
 		}
 	}
 	Result = status
+}
+
+func TestValue_panicSafety(t *testing.T) {
+	// Ensure clean state
+	if val := atomic.LoadUint32(&valueActive); val != 0 {
+		t.Fatalf("valueActive should be 0 initially, got %d", val)
+	}
+
+	panickingNode := func() (Tick, []Node) {
+		panic("boom")
+	}
+
+	// Helper to recover panic
+	func() {
+		defer func() {
+			if r := recover(); r != "boom" {
+				t.Errorf("caught unexpected panic: %v", r)
+			}
+		}()
+		// Trigger the panic path
+		// calling n.Value(key) calls valueSync -> valuePrep.
+		Node(panickingNode).Value("key")
+	}()
+
+	// Verify flag is reset
+	if val := atomic.LoadUint32(&valueActive); val != 0 {
+		t.Errorf("valueActive stuck at %d after panic", val)
+		// Clean up for other tests
+		atomic.StoreUint32(&valueActive, 0)
+	}
 }
