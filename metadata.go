@@ -27,9 +27,7 @@ import "iter"
 //
 // Note: [Node] implements this interface.
 type Metadata interface {
-	// Value returns the value associated with the given key, or nil if not present.
-	// This loosely corresponds to [context.Context]'s `Value` method.
-	Value(key any) any
+	Valuer
 
 	// Children yields the logical children of this metadata node.
 	// Returning false from the yield function stops iteration.
