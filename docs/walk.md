@@ -67,16 +67,19 @@ The following benchmarks verify the performance characteristics of `Walk` on an 
 
 | Benchmark               | Iterations | Time/Op   | Alloc/Op | Notes                                    |
 |:------------------------|:-----------|:----------|:---------|:-----------------------------------------|
-| `Walk_Deep100`          | 48,880     | ~22.6 µs  | 12.9 KB  | Linear depth traversal                   |
-| `Walk_Wide100`          | 54,868     | ~21.7 µs  | 12.9 KB  | Breadth traversal (flat)                 |
-| `Walk_LargeTree`        | 6,991      | ~171.3 µs | 99.9 KB  | Mixed (781 nodes)                        |
-| `Walk_StructureDeep100` | 4,012      | ~300.3 µs | 217.7 KB | **~13x Slower** due to metadata overhead |
+| `Walk_Deep100`          | 43,542     | ~27.5 µs  | 15.5 KB  | Linear depth traversal                   |
+| `Walk_Wide100`          | 47,298     | ~25.5 µs  | 15.5 KB  | Breadth traversal (flat)                 |
+| `Walk_LargeTree`        | 5,924      | ~198.1 µs | 119.5 KB | Mixed (781 nodes)                        |
+| `Walk_StructureDeep100` | 1,945      | ~604.2 µs | 220.3 KB | **~25x Slower** due to metadata overhead |
+| `Walk_HybridOptimized`  | 234,074    | ~5.2 µs   | 2.7 KB   | **~5x Faster** than standard traversal   |
 
 **Analysis**:
 
-* **Standard Traversal**: Highly efficient (~200ns per node). Memory allocation is dominated by the recursive stack and slice handling.
-* **Structure Overhead**: Using `WithStructure` introduces significant overhead (approx. 13x slower in deep trees). This is due to the `Node.Value` synchronization mechanism (`sync.Mutex` and channel ops) required for each node visit.
-* **Recommendation**: Use `WithStructure` judiciously for complex composite nodes where logical abstraction is valuable, rather than universally on all leaf nodes.
+*   **Standard Traversal**: Efficient (~200ns per node), dominated by recursion and slicing.
+*   **Structure Overhead**: `WithStructure` (on `Node`) introduces massive overhead (~6µs per node vs ~0.2µs). This is primarily due to the `Node.Value` locking mechanism (`runtime.Callers` checks etc).
+*   **Optimized Metadata**: Implementing a custom `Metadata` struct (as per the tip below) bypasses `Node` overhead completely, resulting in extremely fast traversal (~50ns per node).
+
+**Recommendation**: Use `WithStructure` on `Node` sparingly. For extensive logical trees, implementing a custom lightweight `Metadata` type is significantly more performant.
 
 ### Concurrency Safety
 

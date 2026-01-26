@@ -19,16 +19,16 @@ package behaviortree
 import "iter"
 
 // Metadata represents the "conceptual" structure of a behavior tree or subtree, which may or may not correspond to
-// actual `Node` instances.
+// actual [Node] instances.
 //
 // This interface allows for efficient traversal and introspection of tree structures without necessarily incurring the
-// overhead of `Node.Value` for every single node, effectively allowing whole subtrees to be "virtualized" or
+// overhead of [Node.Value] for every single node, effectively allowing whole subtrees to be "virtualized" or
 // generated on demand.
 //
-// Note: `Node` implements this interface.
+// Note: [Node] implements this interface.
 type Metadata interface {
 	// Value returns the value associated with the given key, or nil if not present.
-	// This loosely corresponds to `context.Context.Value`.
+	// This loosely corresponds to [context.Context]'s `Value` method.
 	Value(key any) any
 
 	// Children yields the logical children of this metadata node.
@@ -62,7 +62,7 @@ func (n Node) Name() string {
 // physical implementation (closures). This is useful for:
 //   - Decorators or wrappers that should appear as a single node or transparent.
 //   - Complex leaf nodes (like FSMs) that want to expose internal state as a subtree.
-//   - Optimizing traversal by providing a `Metadata` sequence that avoids the `Value` lock overhead for children.
+//   - Optimizing traversal by providing a [Metadata] sequence that avoids the [Node.Value] lock overhead for children.
 //
 // Passing a nil sequence will cause Node.Structure to return nil, clearing any previous structure and reverting to
 // physical node expansion. To explicitly mask children (making the node appear as a leaf), pass an empty sequence:
@@ -89,7 +89,7 @@ func (n Node) Structure() iter.Seq[Metadata] {
 // Walk traverses the "conceptual" tree structure starting from n, depth-first.
 //
 // It uses the `Metadata` interface to determine children, preferring `n.Structure()` (logical children) over
-// physical node expansion if present. This allows for rich, efficient introspection of complex or virtualized trees.
+// physical node expansion if present. This allows for rich, efficient introspection of complex or stateful trees.
 func Walk(n Metadata, fn func(n Metadata) bool) {
 	walk(n, fn)
 }
@@ -109,6 +109,10 @@ func walk(n Metadata, fn func(n Metadata) bool) bool {
 	return !stopped
 }
 
+// Children yields the logical children of the node.
+//
+// It prefers [Node.Structure] (logical children) over physical node expansion if present. This allows for rich,
+// efficient introspection of complex or stateful trees.
 func (n Node) Children(yield func(Metadata) bool) {
 	if s := n.Structure(); s != nil {
 		s(yield)
