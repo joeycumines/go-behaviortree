@@ -68,7 +68,7 @@ func TestNew_leaf(t *testing.T) {
 			}
 
 			// For leaf nodes, children should be nil or empty
-			if children != nil && len(children) != 0 {
+			if len(children) != 0 {
 				t.Errorf("leaf node should have nil or empty children, got %v", children)
 			}
 		})
@@ -588,7 +588,7 @@ func TestNew_threadSafety(t *testing.T) {
 				if tick == nil {
 					t.Errorf("goroutine %d iteration %d: tick is nil", iteration, j)
 				}
-				if children != nil && len(children) != 0 {
+				if len(children) != 0 {
 					t.Errorf("goroutine %d iteration %d: unexpected children", iteration, j)
 				}
 
@@ -1258,7 +1258,6 @@ func TestGetFrame_nilNode(t *testing.T) {
 
 // TestGetFrame_fromCustomValuer tests GetFrame with custom Valuer implementation
 func TestGetFrame_fromCustomValuer(t *testing.T) {
-	type testKey struct{}
 
 	// Create a custom valuer
 	customValuer := Node(func() (Tick, []Node) {
@@ -1294,7 +1293,6 @@ func TestGetFrame_fromCustomValuer(t *testing.T) {
 
 // TestGetFrame_valuerWithoutFrame tests GetFrame with valuer that doesn't have frame
 func TestGetFrame_valuerWithoutFrame(t *testing.T) {
-	type testKey struct{}
 
 	// Create a valuer that doesn't provide frame
 	valuerNoFrame := Node(func() (Tick, []Node) {

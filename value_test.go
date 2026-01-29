@@ -157,7 +157,7 @@ func TestNode_Value_noCaller(t *testing.T) {
 	}
 	// Ensure lock can still be acquired after Value call with nil key (no deadlock)
 	valueDataMutex.Lock()
-	//nolint:staticcheck
+	//lint:ignore SA2001 testing lock availability
 	valueDataMutex.Unlock()
 }
 
@@ -373,8 +373,7 @@ func ExampleUseValueProvider_multiple() {
 	type statsKey struct{}
 
 	// Create a node with multiple handlers
-	var node Node
-	node = func() (Tick, []Node) {
+	node := Node(func() (Tick, []Node) {
 		// Register handler for configuration
 		UseValueHandler(func(key any) (any, bool) {
 			if _, ok := key.(configKey); ok {
@@ -393,7 +392,7 @@ func ExampleUseValueProvider_multiple() {
 
 		// Return a simple success tick
 		return func(children []Node) (Status, error) { return Success, nil }, nil
-	}
+	})
 
 	// Query each key
 	config := node.Value(configKey{})
@@ -415,8 +414,7 @@ func TestUseValueProvider_customNode(t *testing.T) {
 	customNode := New(func(children []Node) (Status, error) { return Success, nil })
 
 	// Create a wrapper node that registers a handler
-	var wrappedNode Node
-	wrappedNode = func() (Tick, []Node) {
+	wrappedNode := Node(func() (Tick, []Node) {
 		UseValueHandler(func(key any) (any, bool) {
 			if _, ok := key.(customKey); ok {
 				return "custom-value", true
@@ -424,7 +422,7 @@ func TestUseValueProvider_customNode(t *testing.T) {
 			return nil, false
 		})
 		return customNode()
-	}
+	})
 
 	// Verify the handler works
 	if v := wrappedNode.Value(customKey{}); v != "custom-value" {
@@ -443,8 +441,7 @@ func TestUseValueProvider_nesting(t *testing.T) {
 	k1 := outerKey{}
 	k2 := innerKey{}
 
-	var innerNode Node
-	innerNode = func() (Tick, []Node) {
+	innerNode := Node(func() (Tick, []Node) {
 		UseValueHandler(func(key any) (any, bool) {
 			if k, ok := key.(innerKey); ok && k == k2 {
 				return "inner-value", true
@@ -452,10 +449,9 @@ func TestUseValueProvider_nesting(t *testing.T) {
 			return nil, false
 		})
 		return func(children []Node) (Status, error) { return Success, nil }, nil
-	}
+	})
 
-	var outerNode Node
-	outerNode = func() (Tick, []Node) {
+	outerNode := Node(func() (Tick, []Node) {
 		UseValueHandler(func(key any) (any, bool) {
 			if k, ok := key.(outerKey); ok && k == k1 {
 				return "outer-value", true
@@ -465,7 +461,7 @@ func TestUseValueProvider_nesting(t *testing.T) {
 		// Call inner node to register its handler
 		_, _ = innerNode()
 		return func(children []Node) (Status, error) { return Success, nil }, nil
-	}
+	})
 
 	// Both handlers should be accessible
 	if v := outerNode.Value(k1); v != "outer-value" {
@@ -485,8 +481,7 @@ func TestUseValueProvider_order(t *testing.T) {
 	k1 := key1{}
 
 	// Register handlers in a specific order
-	var node Node
-	node = func() (Tick, []Node) {
+	node := Node(func() (Tick, []Node) {
 		UseValueHandler(func(key any) (any, bool) {
 			if k, ok := key.(key1); ok && k == k1 {
 				return "first", true
@@ -500,7 +495,7 @@ func TestUseValueProvider_order(t *testing.T) {
 			return nil, false
 		})
 		return func(children []Node) (Status, error) { return Success, nil }, nil
-	}
+	})
 
 	// First registered handler should win (it sets the value first)
 	if v := node.Value(k1); v != "first" {
@@ -511,14 +506,13 @@ func TestUseValueProvider_order(t *testing.T) {
 func TestUseValueProvider_nilNode(t *testing.T) {
 	// UseValueProvider should not panic even with nil node
 	// It's just a package-level function
-	var wrapped Node
-	wrapped = func() (Tick, []Node) {
+	wrapped := Node(func() (Tick, []Node) {
 		UseValueHandler(func(key any) (any, bool) {
 			return "value", true
 		})
 		// Normally would return n(), but here we test the handler registration alone
 		return func(children []Node) (Status, error) { return Failure, nil }, nil
-	}
+	})
 
 	if v := wrapped.Value("any-key"); v == nil {
 		// Handler should not find the key since it's not exact match
