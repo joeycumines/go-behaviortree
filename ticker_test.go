@@ -33,7 +33,7 @@ func TestNewTicker_panic1(t *testing.T) {
 			t.Fatal("unexpected panic", s)
 		}
 	}()
-	//lint:ignore SA1012 testing nil context
+	//nolint:staticcheck
 	NewTicker(nil, 1, func() (Tick, []Node) {
 		return nil, nil
 	})

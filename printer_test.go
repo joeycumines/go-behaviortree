@@ -129,12 +129,12 @@ func dummyNode() (Tick, []Node) {
 }
 
 func TestDefaultPrinterInspector_nil(t *testing.T) {
-	var actual [2]interface{}
+	var actual [2]any
 	actual[0], actual[1] = DefaultPrinterInspector(nil, nil)
 	if !reflect.DeepEqual(
 		actual,
-		[2]interface{}{
-			[]interface{}{
+		[2]any{
+			[]any{
 				`0x0`,
 				`-`,
 				`0x0`,
@@ -143,8 +143,8 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 			`<nil> | <nil>`,
 		},
 	) {
-		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]interface{}{
-			[]interface{}{
+		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]any{
+			[]any{
 				`0x0`,
 				`-`,
 				`0x0`,
@@ -157,8 +157,8 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 	actual[0], actual[1] = DefaultPrinterInspector(node, nil)
 	if !reflect.DeepEqual(
 		actual,
-		[2]interface{}{
-			[]interface{}{
+		[2]any{
+			[]any{
 				fmt.Sprintf(`%p`, node),
 				`printer_test.go:128`,
 				`0x0`,
@@ -167,8 +167,8 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 			`github.com/joeycumines/go-behaviortree.dummyNode | <nil>`,
 		},
 	) {
-		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]interface{}{
-			[]interface{}{
+		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]any{
+			[]any{
 				fmt.Sprintf(`%p`, node),
 				`printer_test.go:128`,
 				`0x0`,
@@ -181,8 +181,8 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 	actual[0], actual[1] = DefaultPrinterInspector(nil, tick)
 	if !reflect.DeepEqual(
 		actual,
-		[2]interface{}{
-			[]interface{}{
+		[2]any{
+			[]any{
 				`0x0`,
 				`-`,
 				fmt.Sprintf(`%p`, tick),
@@ -191,8 +191,8 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 			`<nil> | github.com/joeycumines/go-behaviortree.Selector`,
 		},
 	) {
-		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]interface{}{
-			[]interface{}{
+		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]any{
+			[]any{
 				`0x0`,
 				`-`,
 				fmt.Sprintf(`%p`, tick),
@@ -205,8 +205,8 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 
 func TestTreePrinter_Fprint_emptyMeta(t *testing.T) {
 	p := TreePrinter{
-		Inspector: func(node Node, tick Tick) (meta []interface{}, value interface{}) {
-			return []interface{}{``, ``, ``}, ``
+		Inspector: func(node Node, tick Tick) (meta []any, value any) {
+			return []any{``, ``, ``}, ``
 		},
 		Formatter: DefaultPrinterFormatter,
 	}
@@ -220,8 +220,8 @@ func TestTreePrinter_Fprint_emptyMeta(t *testing.T) {
 func TestTreePrinter_Alignment(t *testing.T) {
 	// this checks that a deep child with expanding metadata affects the root column size
 	p := TreePrinter{
-		Inspector: func(node Node, tick Tick) (meta []interface{}, value interface{}) {
-			return []interface{}{
+		Inspector: func(node Node, tick Tick) (meta []any, value any) {
+			return []any{
 				fmt.Sprintf("col1-%s", node.String()),
 				fmt.Sprintf("col2-%s", node.String()),
 			}, node.String()
@@ -247,24 +247,24 @@ func TestTreePrinter_Alignment(t *testing.T) {
 	// The Inspector implementation above calls `node.String()` which loops forever.
 	// Let's make a simple inspector.
 
-	p.Inspector = func(node Node, tick Tick) (meta []interface{}, value interface{}) {
+	p.Inspector = func(node Node, tick Tick) (meta []any, value any) {
 		node()
 		// name is actually the tick, but we can return strings directly from this mock.
 		// Wait, the node structure:
 		// root -> gets tick returns values.
 		// let's assume we can map node pointer to name.
-		return []interface{}{"c1", "c2"}, "val"
+		return []any{"c1", "c2"}, "val"
 	}
 
 	// But we need per-node differences.
 	// Let's use the Formatter directly since that's what we are testing (the treePrinterNode implementation).
 	root := DefaultPrinterFormatter()
-	root.Add([]interface{}{"r1", "r2"}, "root")
+	root.Add([]any{"r1", "r2"}, "root")
 
-	child := root.Add([]interface{}{"c1", "c2"}, "child")
+	child := root.Add([]any{"c1", "c2"}, "child")
 
 	// grandchild has LONG metadata
-	child.Add([]interface{}{"grandchild-1-very-long", "gc2"}, "grandchild")
+	child.Add([]any{"grandchild-1-very-long", "gc2"}, "grandchild")
 
 	// We expect the output to have the first column padded to the width of "grandchild-1-very-long"
 	// "grandchild-1-very-long" length is 22.
@@ -327,7 +327,7 @@ func TestTreePrinter_rootOverwrite(t *testing.T) {
 
 	// 2. Add a child
 	// Should be added as a child, NOT overwrite root
-	root.Add([]interface{}{"childMeta"}, "childValue")
+	root.Add([]any{"childMeta"}, "childValue")
 
 	output := string(root.Bytes())
 

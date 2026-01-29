@@ -34,7 +34,7 @@ type (
 	// TreePrinter provides a generalised implementation of Printer used as the DefaultPrinter
 	TreePrinter struct {
 		// Inspector configures the meta and value for a node with a given tick
-		Inspector func(node Node, tick Tick) (meta []interface{}, value interface{})
+		Inspector func(node Node, tick Tick) (meta []any, value any)
 		// Formatter initialises a new printer tree and returns it as a TreePrinterNode
 		Formatter func() TreePrinterNode
 	}
@@ -42,7 +42,7 @@ type (
 	// TreePrinterNode models a BT node for printing and is used by the TreePrinter implementation in this package
 	TreePrinterNode interface {
 		// Add should wire up a new node to the receiver then return it
-		Add(meta []interface{}, value interface{}) TreePrinterNode
+		Add(meta []any, value any) TreePrinterNode
 		// Bytes should encode the node and all children in preparation for use within TreePrinter
 		Bytes() []byte
 	}
@@ -66,7 +66,7 @@ func (n Node) String() string {
 }
 
 // DefaultPrinterInspector is used by DefaultPrinter
-func DefaultPrinterInspector(node Node, tick Tick) ([]interface{}, interface{}) {
+func DefaultPrinterInspector(node Node, tick Tick) ([]any, any) {
 	var (
 		nodeName string
 		tickName string
@@ -113,7 +113,7 @@ func DefaultPrinterInspector(node Node, tick Tick) ([]interface{}, interface{}) 
 		tickStrings.ptr = "0x0"
 	}
 
-	return []interface{}{
+	return []any{
 		nodeStrings.ptr,
 		nodeStrings.file,
 		tickStrings.ptr,
@@ -175,7 +175,7 @@ type treePrinterNode struct {
 	initialized bool
 }
 
-func (n *treePrinterNode) Add(meta []interface{}, value interface{}) TreePrinterNode {
+func (n *treePrinterNode) Add(meta []any, value any) TreePrinterNode {
 	strs := make([]string, len(meta))
 	for i, v := range meta {
 		if s, ok := v.(string); ok {

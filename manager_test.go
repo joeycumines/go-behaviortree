@@ -417,7 +417,7 @@ func checkNumGoroutines(t *testing.T) func(increase bool, wait time.Duration) {
 		t.Helper()
 	}
 	var (
-		errorf = func(format string, values ...interface{}) {
+		errorf = func(format string, values ...any) {
 			if err := fmt.Errorf(format, values...); t != nil {
 				t.Error(err)
 			} else {

@@ -27,21 +27,21 @@ import (
 func ExampleShuffle() {
 	randSource := rand.NewSource(1231244)
 	var (
-		newPrintlnFn = func(fn func() []interface{}) Tick {
+		newPrintlnFn = func(fn func() []any) Tick {
 			return func([]Node) (Status, error) {
 				fmt.Println(fn()...)
 				return Success, nil
 			}
 		}
-		newPrintln = func(v ...interface{}) Tick { return newPrintlnFn(func() []interface{} { return v }) }
+		newPrintln = func(v ...any) Tick { return newPrintlnFn(func() []any { return v }) }
 		done       bool
 		ticker     = NewTickerStopOnFailure(context.Background(), time.Millisecond, New(
 			Sequence,
-			New(newPrintlnFn(func() func() []interface{} {
+			New(newPrintlnFn(func() func() []any {
 				var i int
-				return func() []interface{} {
+				return func() []any {
 					i++
-					return []interface{}{`tick number`, i}
+					return []any{`tick number`, i}
 				}
 			}())),
 			New(

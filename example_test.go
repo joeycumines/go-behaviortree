@@ -369,7 +369,7 @@ func ExampleContext() {
 
 	var (
 		btCtx = new(Context).WithTimeout(ctx, time.Millisecond*100)
-		debug = func(args ...interface{}) Tick {
+		debug = func(args ...any) Tick {
 			return func([]Node) (Status, error) {
 				fmt.Println(args...)
 				return Success, nil

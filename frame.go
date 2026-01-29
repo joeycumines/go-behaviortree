@@ -18,38 +18,48 @@ package behaviortree
 
 import (
 	"reflect"
+	"runtime"
 )
 
-type (
-	// Frame is a partial copy of runtime.Frame.
-	//
-	// This packages captures details about the caller of it's New and NewNode functions, embedding them into the
-	// nodes themselves, for tree printing / tracing purposes.
-	Frame struct {
-		// PC is the program counter for the location in this frame.
-		// For a frame that calls another frame, this will be the
-		// program counter of a call instruction. Because of inlining,
-		// multiple frames may have the same PC value, but different
-		// symbolic information.
-		PC uintptr
-		// Function is the package path-qualified function name of
-		// this call frame. If non-empty, this string uniquely
-		// identifies a single function in the program.
-		// This may be the empty string if not known.
-		Function string
-		// File and Line are the file name and line number of the
-		// location in this frame. For non-leaf frames, this will be
-		// the location of a call. These may be the empty string and
-		// zero, respectively, if not known.
-		File string
-		Line int
-		// Entry point program counter for the function; may be zero
-		// if not known.
-		Entry uintptr
+// Frame is a partial copy of runtime.Frame.
+//
+// This packages captures details about the caller of it's New and NewNode functions, embedding them into the
+// nodes themselves, for tree printing / tracing purposes.
+type Frame struct {
+	// PC is the program counter for the location in this frame.
+	// For a frame that calls another frame, this will be the
+	// program counter of a call instruction. Because of inlining,
+	// multiple frames may have the same PC value, but different
+	// symbolic information.
+	PC uintptr
+	// Function is the package path-qualified function name of
+	// this call frame. If non-empty, this string uniquely
+	// identifies a single function in the program.
+	// This may be the empty string if not known.
+	Function string
+	// File and Line are the file name and line number of the
+	// location in this frame. For non-leaf frames, this will be
+	// the location of a call. These may be the empty string and
+	// zero, respectively, if not known.
+	File string
+	Line int
+	// Entry point program counter for the function; may be zero
+	// if not known.
+	Entry uintptr
+}
+
+// NewFrame is an optional factory function initialize a [Frame] from a [runtime.Frame].
+func NewFrame(v runtime.Frame) Frame {
+	return Frame{
+		PC:       v.PC,
+		Function: v.Function,
+		File:     v.File,
+		Line:     v.Line,
+		Entry:    v.Entry,
 	}
+}
 
-	vkFrame struct{}
-)
+type vkFrame struct{}
 
 // GetFrame retrieves the attached frame from the Valuer, or nil if not present.
 //
@@ -89,7 +99,7 @@ func (n Node) Frame() *Frame {
 // Frame will return an approximation of a call frame based on the receiver, or nil.
 func (t Tick) Frame() *Frame { return newFrame(t) }
 
-func newFrame(v interface{}) (f *Frame) {
+func newFrame(v any) (f *Frame) {
 	if v := reflect.ValueOf(v); v.IsValid() && v.Kind() == reflect.Func && !v.IsNil() {
 		p := v.Pointer()
 		if v := runtimeFuncForPC(p); v != nil {
