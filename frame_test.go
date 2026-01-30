@@ -166,3 +166,68 @@ func TestTick_Frame(t *testing.T) {
 		})
 	}
 }
+
+func TestUseFrame(t *testing.T) {
+	f := &Frame{Function: "test_frame_func", Line: 123}
+
+	// 1. Direct Provider
+	p := UseFrame(f)
+	if v, ok := p.Value(vkFrame{}); !ok {
+		t.Error("UseFrame returned false for vkFrame")
+	} else {
+		got := v.(*Frame)
+		if got.Function != f.Function {
+			t.Errorf("got function %q; want %q", got.Function, f.Function)
+		}
+	}
+
+	// 2. Empty Frame
+	fEmpty := &Frame{}
+	pEmpty := UseFrame(fEmpty)
+	if v, ok := pEmpty.Value(vkFrame{}); !ok {
+		t.Error("UseFrame(empty) returned false")
+	} else {
+		got := v.(*Frame)
+		if got != fEmpty {
+			t.Errorf("UseFrame(empty) returned %p; want %p", got, fEmpty)
+		}
+	}
+
+	// 3. Nil Frame
+	pNil := UseFrame(nil)
+	if v, ok := pNil.Value(vkFrame{}); !ok {
+		t.Error("UseFrame(nil) should return true for vkFrame")
+	} else if v != nil {
+		t.Errorf("UseFrame(nil) should return nil value; got %v", v)
+	}
+
+	// 4. Integration
+	var node Node = func() (Tick, []Node) {
+		UseValueProvider(UseFrame(f))
+		return func(children []Node) (Status, error) { return Success, nil }, nil
+	}
+
+	// Use GetFrame to verify exact attached value
+	gotF := GetFrame(node)
+	if gotF == nil {
+		t.Fatal("GetFrame(node) returned nil")
+	}
+	if gotF.Function != "test_frame_func" {
+		t.Errorf("GetFrame(node).Function = %q", gotF.Function)
+	}
+
+	// 5. Integration with Nil
+	var nodeNil Node = func() (Tick, []Node) {
+		UseValueProvider(UseFrame(nil))
+		return func(children []Node) (Status, error) { return Success, nil }, nil
+	}
+
+	if gf := GetFrame(nodeNil); gf != nil {
+		t.Errorf("GetFrame(nodeNil) = %v; want nil", gf)
+	}
+
+	// 6. Unknown Key
+	if _, ok := p.Value("unknown_key"); ok {
+		t.Error("UseFrame returned true for unknown key")
+	}
+}

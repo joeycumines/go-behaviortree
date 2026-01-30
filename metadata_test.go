@@ -2,6 +2,7 @@ package behaviortree
 
 import (
 	"fmt"
+	"iter"
 	"reflect"
 	"slices"
 	"strings"
@@ -20,6 +21,18 @@ func TestNode_Metadata(t *testing.T) {
 		}
 		if n.Name() != "" {
 			t.Error("original node modified")
+		}
+	})
+
+	t.Run("WithName Clear", func(t *testing.T) {
+		n := NewNode(func([]Node) (Status, error) { return Success, nil }, nil).WithName("foo")
+		n2 := n.WithName("")
+		if n2.Name() != "" {
+			t.Error("Name should be empty")
+		}
+		// Verify Value returns nil (interface)
+		if v := n2.Value(vkName{}); v != nil {
+			t.Errorf("Value should be nil, got %v", v)
 		}
 	})
 
@@ -169,5 +182,157 @@ func TestNode_String_Name(t *testing.T) {
 	// Output should look something like: [meta...]  MyNode
 	if !strings.Contains(s, "MyNode") {
 		t.Errorf("expected string to contain 'MyNode', got:\n%s", s)
+	}
+}
+
+func TestUseName(t *testing.T) {
+	// 1. Test direct provider usage
+	name := "test-provider-name"
+	p := UseName(name)
+
+	// Check correct key
+	if v, ok := p.Value(vkName{}); !ok || v != name {
+		t.Errorf("Value(vkName{}) = %v, %v; want %v, true", v, ok, name)
+	}
+
+	// Check incorrect key
+	if _, ok := p.Value("wrong"); ok {
+		t.Error("Value(wrong key) returned true")
+	}
+
+	// 2. Integration with Node
+	// This node simulates a factory that uses UseName
+	var node Node = func() (Tick, []Node) {
+		UseValueProvider(UseName("integrated-name"))
+		return func(children []Node) (Status, error) { return Success, nil }, nil
+	}
+
+	if n := node.Name(); n != "integrated-name" {
+		t.Errorf("Node.Name() = %q; want %q", n, "integrated-name")
+	}
+
+	// Verify using GetName helper
+	if n := GetName(node); n != "integrated-name" {
+		t.Errorf("GetName(node) = %q; want %q", n, "integrated-name")
+	}
+
+	// 3. Test Clearing (Empty String)
+	pClear := UseName("")
+	if v, ok := pClear.Value(vkName{}); !ok {
+		t.Error("UseName(\"\").Value returned false")
+	} else if v != nil {
+		t.Errorf("UseName(\"\").Value = %v; want nil", v)
+	}
+}
+
+func TestUseStructure(t *testing.T) {
+	// 1. Test direct provider
+	child := NewNode(func([]Node) (Status, error) { return Success, nil }, nil)
+	seq := slices.Values([]Metadata{child})
+
+	p := UseStructure(seq)
+
+	// Check correct key
+	if v, ok := p.Value(vkStructure{}); !ok {
+		t.Error("Value(vkStructure{}) returned false")
+	} else {
+		// Verify exact value identity if possible, or behavior
+		s, ok := v.(iter.Seq[Metadata])
+		if !ok {
+			t.Errorf("Value returned %T; want iter.Seq[Metadata]", v)
+		} else {
+			collected := slices.Collect(s)
+			if len(collected) != 1 || fmt.Sprintf("%p", collected[0]) != fmt.Sprintf("%p", child) {
+				t.Errorf("Structure content mismatch: %v", collected)
+			}
+		}
+	}
+
+	// Check incorrect key
+	if _, ok := p.Value("wrong"); ok {
+		t.Error("Value(wrong key) returned true")
+	}
+
+	// 2. Integration with Node
+	var node Node = func() (Tick, []Node) {
+		UseValueProvider(UseStructure(seq))
+		return func([]Node) (Status, error) { return Success, nil }, nil
+	}
+
+	s := node.Structure()
+	if s == nil {
+		t.Fatal("Node.Structure() returned nil")
+	}
+	found := slices.Collect(s)
+	if len(found) != 1 || fmt.Sprintf("%p", found[0]) != fmt.Sprintf("%p", child) {
+		t.Errorf("Node.Structure() mismatch")
+	}
+
+	// 3. Test Nil
+	nilP := UseStructure(nil)
+	if v, ok := nilP.Value(vkStructure{}); !ok {
+		t.Error("UseStructure(nil).Value returned false")
+	} else if v != nil {
+		t.Errorf("UseStructure(nil).Value = %v; want nil", v)
+	}
+
+	// 4. Test Explicit Empty
+	emptySeq := func(yield func(Metadata) bool) {}
+	pEmpty := UseStructure(emptySeq)
+	if v, ok := pEmpty.Value(vkStructure{}); !ok {
+		t.Error("UseStructure(empty).Value returned false")
+	} else {
+		if v == nil {
+			t.Error("UseStructure(empty).Value is nil")
+		} else if s, ok := v.(iter.Seq[Metadata]); !ok {
+			t.Errorf("UseStructure(empty).Value type = %T; want iter.Seq[Metadata]", v)
+		} else if len(slices.Collect(s)) != 0 {
+			t.Error("UseStructure(empty) sequence is not empty")
+		}
+	}
+}
+
+func TestWalk_EarlyStop(t *testing.T) {
+	child := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil).WithName("Child")
+	root := NewNode(func(children []Node) (Status, error) { return Success, nil }, []Node{child}).WithName("Root")
+
+	// 1. Stop at Root
+	stops := 0
+	Walk(root, func(n Metadata) bool {
+		stops++
+		return false
+	})
+	if stops != 1 {
+		t.Errorf("Walk didn't stop at root, visited %d nodes", stops)
+	}
+
+	// 2. Stop at Child
+	visited := []string{}
+	Walk(root, func(n Metadata) bool {
+		if node, ok := n.(Node); ok {
+			visited = append(visited, node.Name())
+			if node.Name() == "Child" {
+				return false
+			}
+		}
+		return true
+	})
+	if len(visited) != 2 {
+		t.Errorf("Walk didn't stop at child: %v", visited)
+	}
+}
+
+func TestChildren_YieldStop(t *testing.T) {
+	child1 := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil).WithName("Child1")
+	child2 := NewNode(func(children []Node) (Status, error) { return Success, nil }, nil).WithName("Child2")
+	root := NewNode(func(children []Node) (Status, error) { return Success, nil }, []Node{child1, child2})
+
+	count := 0
+	root.Children(func(m Metadata) bool {
+		count++
+		return false
+	})
+	if count != 1 {
+		t.Errorf("Children yield didn't stop, count=%d", count)
 	}
 }

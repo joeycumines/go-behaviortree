@@ -127,3 +127,16 @@ func TestShuffle_nil(t *testing.T) {
 		t.Fatal(v)
 	}
 }
+
+func TestShuffle_defaultSource(t *testing.T) {
+	// Execute the tick to trigger the default source usage
+	tick := Shuffle(Sequence, nil)
+	if tick == nil {
+		t.Fatal("expected non-nil tick")
+	}
+	// We just need to call it to exercise the default source path
+	tick([]Node{
+		func() (Tick, []Node) { return func([]Node) (Status, error) { return Success, nil }, nil },
+		func() (Tick, []Node) { return func([]Node) (Status, error) { return Success, nil }, nil },
+	})
+}

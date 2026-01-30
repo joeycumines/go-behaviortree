@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -66,17 +67,17 @@ func TestNode_String(t *testing.T) {
 		{
 			Name:  `single sequence`,
 			Node:  New(Sequence),
-			Value: "[0x1 printer_test.go:68 0x2 sequence.go:21]  github.com/joeycumines/go-behaviortree.TestNode_String | github.com/joeycumines/go-behaviortree.Sequence",
+			Value: "[0x1 printer_test.go:69 0x2 sequence.go:21]  github.com/joeycumines/go-behaviortree.TestNode_String | github.com/joeycumines/go-behaviortree.Sequence",
 		},
 		{
 			Name:  `single closure`,
 			Node:  New(func(children []Node) (Status, error) { panic(`TestNode_String`) }),
-			Value: "[0x1 printer_test.go:73 0x2 printer_test.go:73]  github.com/joeycumines/go-behaviortree.TestNode_String | github.com/joeycumines/go-behaviortree.TestNode_String.funcN",
+			Value: "[0x1 printer_test.go:74 0x2 printer_test.go:74]  github.com/joeycumines/go-behaviortree.TestNode_String | github.com/joeycumines/go-behaviortree.TestNode_String.funcN",
 		},
 		{
 			Name:  `nil tick`,
 			Node:  New(nil),
-			Value: "[0x1 printer_test.go:78 0x0 -]  github.com/joeycumines/go-behaviortree.TestNode_String | <nil>",
+			Value: "[0x1 printer_test.go:79 0x0 -]  github.com/joeycumines/go-behaviortree.TestNode_String | <nil>",
 		},
 		{
 			Name:  `example counter`,
@@ -160,7 +161,7 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 		[2]any{
 			[]any{
 				fmt.Sprintf(`%p`, node),
-				`printer_test.go:128`,
+				`printer_test.go:129`,
 				`0x0`,
 				`-`,
 			},
@@ -170,7 +171,7 @@ func TestDefaultPrinterInspector_nil(t *testing.T) {
 		t.Errorf("unexpected diff\nexpected: %v\nactual:   %v", [2]any{
 			[]any{
 				fmt.Sprintf(`%p`, node),
-				`printer_test.go:128`,
+				`printer_test.go:129`,
 				`0x0`,
 				`-`,
 			},
@@ -347,4 +348,86 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func TestCoverage_Printer(t *testing.T) {
+	// Mock runtimeFuncForPC to return nil, preventing Frame() resolution
+	originalFuncForPC := runtimeFuncForPC
+	runtimeFuncForPC = func(p uintptr) *runtime.Func { return nil }
+	defer func() { runtimeFuncForPC = originalFuncForPC }()
+
+	// 1. Valid Node/Tick but Frame resolution fails (returns nil)
+	// This covers DefaultPrinterInspector lines:
+	// 83-85 (nodeStrings.file empty -> "-")
+	// 86-88 (nodeName empty -> "-")
+	// 101-106 (tickStrings file/name empty -> "-")
+	// 109-114 (ptr strings empty -> "0x0")
+
+	node := Node(func() (Tick, []Node) { return nil, nil })
+	tick := Tick(func(children []Node) (Status, error) { return Success, nil })
+
+	meta, val := DefaultPrinterInspector(node, tick)
+
+	// Check results
+	// meta: [nodePtr, nodeFile, tickPtr, tickFile]
+	if meta[0] != "0x0" {
+		t.Errorf("Expected node ptr 0x0, got %v", meta[0])
+	}
+	if meta[1] != "-" {
+		t.Errorf("Expected node file -, got %v", meta[1])
+	}
+	if meta[2] != "0x0" {
+		t.Errorf("Expected tick ptr 0x0, got %v", meta[2])
+	}
+	if meta[3] != "-" {
+		t.Errorf("Expected tick file -, got %v", meta[3])
+	}
+
+	if val.(string) != "- | -" {
+		t.Errorf("Expected values '- | -', got %q", val)
+	}
+}
+
+func TestCoverage_Printer_Extras(t *testing.T) {
+	// 2. Frame with PC=0 (covers formatPtr 0 check)
+	// 3. Frame with Windows path (covers shortFileLine backslash)
+	f := &Frame{
+		PC:       0,
+		File:     "C:\\Windows\\System32\\cmd.exe",
+		Line:     10,
+		Function: "winFunc",
+	}
+
+	n := nn(nil, nil).WithFrame(f)
+	meta, _ := DefaultPrinterInspector(n, nil)
+
+	if meta[0] != "0x0" { // formatPtr(0)
+		t.Errorf("Expected 0x0 for PC=0, got %v", meta[0])
+	}
+	// Note: checking strictly for windows path handling.
+	// If the system is windows, both / and \ might work.
+	// But forcing \ path on non-windows is the edge case covering the specific branch.
+	if meta[1] != "cmd.exe:10" { // shortFileLine windows
+		t.Errorf("Expected cmd.exe:10, got %v", meta[1])
+	}
+
+	// 4. TreePrinterNode Add with non-string meta (covers Add else branch)
+	tp := DefaultPrinterFormatter()
+	tp.Add([]any{123, true}, "val")
+	b := tp.Bytes()
+	s := string(b)
+	if !strings.Contains(s, "[123 true]") {
+		t.Errorf("Expected [123 true], got %s", s)
+	}
+
+	// 5. TreePrinterNode multi-line value (covers print loop)
+	tp2 := DefaultPrinterFormatter()
+	tp2.Add(nil, "line1\nline2")
+	b2 := tp2.Bytes()
+	s2 := string(b2)
+	// Output should have indented line2
+	// "line1\n    line2" (assuming 4 spaces indent from prefix logic?)
+	if !strings.Contains(s2, "line1\n    line2") {
+		t.Errorf("Expected indented multiline, got %q", s2)
+	}
 }

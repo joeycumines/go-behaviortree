@@ -79,8 +79,13 @@ func GetName(n Valuer) string {
 
 // WithName returns the value attachable with the name value attached.
 //
+// Passing an empty string will "zero" the name value, effectively clearing any previous name.
+//
 // This helper facilitates interoperability with external implementations of the [ValueAttachable] interface.
 func WithName[T any](n ValueAttachable[T], name string) T {
+	if name == "" {
+		return n.WithValue(vkName{}, nil)
+	}
 	return n.WithValue(vkName{}, name)
 }
 
@@ -92,6 +97,25 @@ func (n Node) WithName(name string) Node {
 // Name returns the name value of the node, or an empty string.
 func (n Node) Name() string {
 	return GetName(n)
+}
+
+type nameValueProvider string
+
+func (p nameValueProvider) Value(key any) (any, bool) {
+	if key == (vkName{}) {
+		if p == "" {
+			return nil, true
+		}
+		return string(p), true
+	}
+	return nil, false
+}
+
+// UseName returns a [ValueProvider] that provides the given name.
+//
+// Passing an empty string will "zero" the name value, effectively clearing any previous name.
+func UseName(name string) ValueProvider {
+	return nameValueProvider(name)
 }
 
 // vkStructure is the context key for Node.Structure
@@ -141,6 +165,26 @@ func (n Node) WithStructure(children iter.Seq[Metadata]) Node {
 // A non-nil empty sequence indicates that the structure is explicitly empty.
 func (n Node) Structure() iter.Seq[Metadata] {
 	return GetStructure(n)
+}
+
+type structureValueProvider iter.Seq[Metadata]
+
+func (p structureValueProvider) Value(key any) (any, bool) {
+	if key == (vkStructure{}) {
+		if p == nil {
+			return nil, true
+		}
+		return iter.Seq[Metadata](p), true
+	}
+	return nil, false
+}
+
+// UseStructure returns a [ValueProvider] that provides the given structure.
+//
+// Passing a nil sequence will attach a nil value, effectively clearing any previous structure.
+// To explicitly mask children (making it appear as a leaf), pass an empty sequence.
+func UseStructure(children iter.Seq[Metadata]) ValueProvider {
+	return structureValueProvider(children)
 }
 
 // Walk traverses the "conceptual" tree structure starting from n, depth-first.
