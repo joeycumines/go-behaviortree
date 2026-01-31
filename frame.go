@@ -71,6 +71,8 @@ func GetFrame(n Valuer) *Frame {
 
 // WithFrame returns the value attachable with the frame attached.
 //
+// If frame is nil, it attaches a nil value for the frame key.
+//
 // This helper facilitates interoperability with external implementations of the [ValueAttachable] interface.
 func WithFrame[T any](n ValueAttachable[T], frame *Frame) T {
 	if frame == nil {
@@ -83,6 +85,30 @@ func WithFrame[T any](n ValueAttachable[T], frame *Frame) T {
 // WithFrame returns a copy of the receiver, wrapped with the frame attached.
 func (n Node) WithFrame(frame *Frame) Node {
 	return WithFrame[Node](n, frame)
+}
+
+type frameValueProvider Frame
+
+func (p *frameValueProvider) Value(key any) (any, bool) {
+	if key == (vkFrame{}) {
+		if p == nil {
+			return nil, true
+		}
+		f := Frame(*p)
+		return &f, true
+	}
+	return nil, false
+}
+
+// UseFrame returns a [ValueProvider] that provides the given frame.
+//
+// If frame is nil, it provides an interface nil for the frame key.
+func UseFrame(frame *Frame) ValueProvider {
+	if frame == nil {
+		return (*frameValueProvider)(nil)
+	}
+	f := *frame
+	return (*frameValueProvider)(&f)
 }
 
 // Frame will return the call frame for the caller of New/NewNode, an approximation based on the receiver, or nil.
