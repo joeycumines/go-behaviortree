@@ -179,21 +179,39 @@ func TestUseFrame(t *testing.T) {
 		if got.Function != f.Function {
 			t.Errorf("got function %q; want %q", got.Function, f.Function)
 		}
+		if got == f {
+			t.Error("UseFrame should return a copy, not the original")
+		}
+		// Verify Immutability (of the returned value)
+		got.Line = 999
+		v2, _ := p.Value(vkFrame{})
+		if v2.(*Frame).Line != 123 {
+			t.Error("UseFrame.Value should return a fresh copy every time")
+		}
 	}
 
-	// 2. Empty Frame
+	// 2. Original modified after UseFrame
+	fMod := &Frame{Line: 1}
+	pMod := UseFrame(fMod)
+	fMod.Line = 2
+	vMod, _ := pMod.Value(vkFrame{})
+	if vMod.(*Frame).Line != 1 {
+		t.Error("UseFrame should copy the input frame immediately")
+	}
+
+	// 3. Empty Frame
 	fEmpty := &Frame{}
 	pEmpty := UseFrame(fEmpty)
 	if v, ok := pEmpty.Value(vkFrame{}); !ok {
 		t.Error("UseFrame(empty) returned false")
 	} else {
 		got := v.(*Frame)
-		if got != fEmpty {
-			t.Errorf("UseFrame(empty) returned %p; want %p", got, fEmpty)
+		if got == fEmpty {
+			t.Errorf("UseFrame(empty) returned original pointer; want copy")
 		}
 	}
 
-	// 3. Nil Frame
+	// 4. Nil Frame
 	pNil := UseFrame(nil)
 	if v, ok := pNil.Value(vkFrame{}); !ok {
 		t.Error("UseFrame(nil) should return true for vkFrame")
@@ -201,13 +219,13 @@ func TestUseFrame(t *testing.T) {
 		t.Errorf("UseFrame(nil) should return nil value; got %v", v)
 	}
 
-	// 4. Integration
+	// 5. Integration
 	var node Node = func() (Tick, []Node) {
 		UseValueProvider(UseFrame(f))
 		return func(children []Node) (Status, error) { return Success, nil }, nil
 	}
 
-	// Use GetFrame to verify exact attached value
+	// Use GetFrame to verify value
 	gotF := GetFrame(node)
 	if gotF == nil {
 		t.Fatal("GetFrame(node) returned nil")
@@ -215,8 +233,11 @@ func TestUseFrame(t *testing.T) {
 	if gotF.Function != "test_frame_func" {
 		t.Errorf("GetFrame(node).Function = %q", gotF.Function)
 	}
+	if gotF == f {
+		t.Error("GetFrame(node) returned original pointer; want copy")
+	}
 
-	// 5. Integration with Nil
+	// 6. Integration with Nil
 	var nodeNil Node = func() (Tick, []Node) {
 		UseValueProvider(UseFrame(nil))
 		return func(children []Node) (Status, error) { return Success, nil }, nil
@@ -226,7 +247,7 @@ func TestUseFrame(t *testing.T) {
 		t.Errorf("GetFrame(nodeNil) = %v; want nil", gf)
 	}
 
-	// 6. Unknown Key
+	// 7. Unknown Key
 	if _, ok := p.Value("unknown_key"); ok {
 		t.Error("UseFrame returned true for unknown key")
 	}

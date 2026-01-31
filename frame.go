@@ -94,7 +94,8 @@ func (p *frameValueProvider) Value(key any) (any, bool) {
 		if p == nil {
 			return nil, true
 		}
-		return (*Frame)(p), true
+		f := Frame(*p)
+		return &f, true
 	}
 	return nil, false
 }
@@ -103,7 +104,11 @@ func (p *frameValueProvider) Value(key any) (any, bool) {
 //
 // If frame is nil, it provides an interface nil for the frame key.
 func UseFrame(frame *Frame) ValueProvider {
-	return (*frameValueProvider)(frame)
+	if frame == nil {
+		return (*frameValueProvider)(nil)
+	}
+	f := *frame
+	return (*frameValueProvider)(&f)
 }
 
 // Frame will return the call frame for the caller of New/NewNode, an approximation based on the receiver, or nil.
