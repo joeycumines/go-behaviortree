@@ -1,4 +1,4 @@
 github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
 github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
-github.com/joeycumines/go-bigbuff v1.21.0 h1:v5Vy+rPKSPSr20YWx7/Pbfb6yqfzGBO9rcHr9t5lpxk=
-github.com/joeycumines/go-bigbuff v1.21.0/go.mod h1:Ftwjd8wCDJqDk5NLsCbTibX0BrbzPv/GYiHoa3fbO9E=
+github.com/joeycumines/go-bigbuff v1.21.1 h1:UNX65np8YFSzORxCMHSrXXVNNI7ebedmBQvqj6v/Fkk=
+github.com/joeycumines/go-bigbuff v1.21.1/go.mod h1:Ftwjd8wCDJqDk5NLsCbTibX0BrbzPv/GYiHoa3fbO9E=
